@@ -1,6 +1,7 @@
 #include <iostream>
 #include <chrono>
 #include <random>
+#include "mkl.h"
 
 using namespace std;
 using namespace std::chrono;
@@ -9,11 +10,11 @@ using namespace std::chrono;
 #include <random>
 using namespace std;
 
-// 使用一维数组初始化矩阵并填充随机浮点数
-void initialize_matrix(float* matrix, int rows, int cols, float low, float high) {
+// 使用一维数组初始化矩阵并填充双精度随机浮点数
+void initialize_matrix(double* matrix, int rows, int cols, double low, double high) {
     random_device rd;
     mt19937 gen(rd());
-    uniform_real_distribution<> distrib(low, high);
+    uniform_real_distribution<double> distrib(low, high);
 
     for (int i = 0; i < rows; ++i) {
         for (int j = 0; j < cols; ++j) {
@@ -23,10 +24,10 @@ void initialize_matrix(float* matrix, int rows, int cols, float low, float high)
 }
 
 // naive
-void matrix_multiply(float* A, float* B, float* C, int m, int n, int k) {
+void matrix_multiply(double* A, double* B, double* C, int m, int n, int k) {
     for (int i = 0; i < m; ++i) {
         for (int j = 0; j < k; ++j) {
-            float sum = 0;
+            double sum = 0;
             for (int x = 0; x < n; ++x) {
                 sum += *(A + i * n + x) * *(B + x * k + j);
             }
@@ -36,10 +37,10 @@ void matrix_multiply(float* A, float* B, float* C, int m, int n, int k) {
 }
 
 // change order
-void matrixMultiply_change_order(float *A, float *B, float *C, int m, int n, int k) {
+void matrixMultiply_change_order(double *A, double *B, double *C, int m, int n, int k) {
     for (int i = 0; i < m; i++) {
         for (int j = 0; j < n; j++) {
-            float a = A[i * n + j];
+            double a = A[i * n + j];
             for (int x = 0; x < k; x++) {
                 C[i * k + x] += a * B[j * k + x];
             }
@@ -48,10 +49,10 @@ void matrixMultiply_change_order(float *A, float *B, float *C, int m, int n, int
 }
 
 // change order + unrolled
-void matrixMultiply_change_order_unrolled4(float *A, float *B, float *C, int m, int n, int k) {
+void matrixMultiply_change_order_unrolled4(double *A, double *B, double *C, int m, int n, int k) {
     for (int i = 0; i < m; i++) {
         for (int j = 0; j < n; j++) {
-            float a = A[i * n + j];
+            double a = A[i * n + j];
             for (int x = 0; x < (k / 4) * 4; x += 4) { 
                 // 主循环展开4次
                 C[i * k + x] += a * B[j * k + x];
@@ -68,21 +69,28 @@ void matrixMultiply_change_order_unrolled4(float *A, float *B, float *C, int m, 
 }
 
 int main() {
-    int m = 512, n = 512, k = 512;
-
+    int m = 1024, n = 1024, k = 1024;
+    double alpha = 1.0, beta = 0.0;
     // 分配一维数组
-    float* A = new float[m * n];
-    float* B = new float[n * k];
-    float* C = new float[m * k];
+    double *A, *B, *C;
+    A = (double *)mkl_malloc( m*k*sizeof( double ), 64 );
+    B = (double *)mkl_malloc( k*n*sizeof( double ), 64 );
+    C = (double *)mkl_malloc( m*n*sizeof( double ), 64 );
+    if (A == NULL || B == NULL || C == NULL) {
+        printf( "\n ERROR: Can't allocate memory for matrices. Aborting... \n\n");
+        mkl_free(A);
+        mkl_free(B);
+        mkl_free(C);
+        return 1;
+    }
 
     initialize_matrix(A, m, n, 0., 10.);
     initialize_matrix(B, n, k, 0., 10.);
 
     auto start = high_resolution_clock::now();
 
-    matrix_multiply(A, B, C, m, n, k);
-    // matrixMultiply_change_order(A, B, C, m, n, k);
-    //matrixMultiply_change_order_unrolled4(A, B, C, m, n, k);
+    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 
+            m, n, k, alpha, A, k, B, n, beta, C, n);
 
     auto stop = high_resolution_clock::now();
     auto duration = duration_cast<microseconds>(stop - start);
@@ -94,9 +102,9 @@ int main() {
     cout << "GFLOPS: " << gflops << endl;
 
     // 释放分配的内存
-    delete[] A;
-    delete[] B;
-    delete[] C;
+    mkl_free(A);
+    mkl_free(B);
+    mkl_free(C);
 
     return 0;
 }
