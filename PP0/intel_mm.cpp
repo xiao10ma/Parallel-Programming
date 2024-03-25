@@ -23,51 +23,6 @@ void initialize_matrix(double* matrix, int rows, int cols, double low, double hi
     }
 }
 
-// naive
-void matrix_multiply(double* A, double* B, double* C, int m, int n, int k) {
-    for (int i = 0; i < m; ++i) {
-        for (int j = 0; j < k; ++j) {
-            double sum = 0;
-            for (int x = 0; x < n; ++x) {
-                sum += *(A + i * n + x) * *(B + x * k + j);
-            }
-            *(C + i * k + j) = sum;
-        }
-    }
-}
-
-// change order
-void matrixMultiply_change_order(double *A, double *B, double *C, int m, int n, int k) {
-    for (int i = 0; i < m; i++) {
-        for (int j = 0; j < n; j++) {
-            double a = A[i * n + j];
-            for (int x = 0; x < k; x++) {
-                C[i * k + x] += a * B[j * k + x];
-            }
-        }
-    }
-}
-
-// change order + unrolled
-void matrixMultiply_change_order_unrolled4(double *A, double *B, double *C, int m, int n, int k) {
-    for (int i = 0; i < m; i++) {
-        for (int j = 0; j < n; j++) {
-            double a = A[i * n + j];
-            for (int x = 0; x < (k / 4) * 4; x += 4) { 
-                // 主循环展开4次
-                C[i * k + x] += a * B[j * k + x];
-                C[i * k + x + 1] += a * B[j * k + x + 1];
-                C[i * k + x + 2] += a * B[j * k + x + 2];
-                C[i * k + x + 3] += a * B[j * k + x + 3];
-            }
-            // 处理剩余元素
-            for (int x = (k / 4) * 4; x < k; x++) {
-                C[i * k + x] += a * B[j * k + x];
-            }
-        }
-    }
-}
-
 int main() {
     int m = 1024, n = 1024, k = 1024;
     double alpha = 1.0, beta = 0.0;

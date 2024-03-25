@@ -44,7 +44,7 @@ sudo sh ./l_onemkl_p_2024.0.0.49673_offline.sh
 ```bash
 source /opt/intel/oneapi/setvars.sh
 ```
-可以输入env | grep SETVARS_COMPLETED来检查一下，输出结果是SETVARS_COMPLETED=1，就证明配置成功了！
+可以输入`env | grep SETVARS_COMPLETED`来检查一下，输出结果是`SETVARS_COMPLETED=1`，就证明配置成功了！
 ```bash
 env | grep SETVARS_COMPLETED
 ```
@@ -110,3 +110,158 @@ g++ matrix_mul.cpp -O3 -fomit-frame-pointer -march=native -ffast-math -o matrix_
 - `-ffast-math`：这个选项放宽了一些数学计算的精度和标准规则，让编译器可以采取一些额外的数学相关优化措施来加速计算过程，但可能会牺牲一定的精确度。
 
 ### 3.5 循环展开
+
+在行主序存储下，通过循环展开并同时执行多个列的乘加操作可以提高效率。具体做法是，选择A矩阵的相同行中的元素a0, a1, a2, a3，这些元素分别与B矩阵的对应列中的相同元素进行乘法操作，然后将结果累加到C矩阵的相应行上。这种方式允许同时处理多个C矩阵的列，从而提高性能。下面是具体实现的代码示例，但要注意，对于列数不能被4整除的情况，还需要额外处理剩余的列。
+```cpp
+void matrixMultiply_change_order_unrolled4(float *A, float *B, float *C, int m, int n, int k) {
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < n; j++) {
+            float a = A[i * n + j];
+            for (int x = 0; x < (k / 4) * 4; x += 4) { 
+                // 主循环展开4次
+                C[i * k + x] += a * B[j * k + x];
+                C[i * k + x + 1] += a * B[j * k + x + 1];
+                C[i * k + x + 2] += a * B[j * k + x + 2];
+                C[i * k + x + 3] += a * B[j * k + x + 3];
+            }
+            // 处理剩余元素
+            for (int x = (k / 4) * 4; x < k; x++) {
+                C[i * k + x] += a * B[j * k + x];
+            }
+        }
+    }
+}
+```
+
+### 3.6 Intel MKL
+
+通过使用mkl_malloc来为三个矩阵分配对齐的内存空间，从而实现了对MKL性能的优化。接下来，采用cblas_dgemm函数来进行矩阵的乘法操作。这里，CblasRowMajor用于指明数组的存储顺序为行主序，而CblasNoTrans则表明不对任何矩阵进行转置操作。通过将alpha和beta参数分别设定为1.0和0.0，实现了C矩阵等于A矩阵与B矩阵乘积的计算。具体的核心代码段展示了这一过程。
+
+```cpp
+double *A, *B, *C;
+A = (double *)mkl_malloc( m*k*sizeof( double ), 64 );
+B = (double *)mkl_malloc( k*n*sizeof( double ), 64 );
+C = (double *)mkl_malloc( m*n*sizeof( double ), 64 );
+
+cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 
+            m, n, k, alpha, A, k, B, n, beta, C, n);
+```
+
+## 4. 实验结果
+
+### 4.1 Python
+
+运行结果：
+```bash
+PP0 ) python3 matrix_mul.py
+Matrix multiplication took 447.659 seconds.
+GFLOPS: 0.002
+```
+Python的运行效率相对较低主要是因为它是一种解释型语言，具有动态类型系统，这意味着代码在运行时逐行转换为机器码且变量类型的检查也在运行时进行，增加了额外的开销。此外，Python的标准实现使用了全局解释器锁（GIL），限制了其在多核CPU上的并行执行能力。高级抽象和自动内存管理等特性虽然提高了开发效率，但也隐藏了底层的复杂性，从而增加了运行时的开销。这些因素共同作用，导致了Python相对于某些编译型语言在运行效率上的不足。
+
+### 4.2 Naive
+
+运行结果：
+
+```bash
+PP0 ) g++ matrix_mul.cpp -o matrix_mul.out
+PP0 ) ./matrix_mul.out 
+Matrix multiplication took 4.09568 seconds.
+GFLOPS: 0.524329
+```
+
+C++的运行效率高主要是因为它是一种编译型语言，其代码在程序运行前就被编译成了直接由硬件执行的机器码，消除了运行时转换的开销。C++提供了低级的编程能力，允许开发者直接管理内存和系统资源，这种直接控制硬件的能力减少了额外的抽象层，从而提高了效率。
+
+### 4.3 Change Order
+
+运行结果：
+```bash
+PP0 ) g++ matrix_mul.cpp -o matrix_mul_change_order.out 
+PP0 ) ./matrix_mul_change_order.out 
+Matrix multiplication took 2.78495 seconds.
+GFLOPS: 0.771104
+```
+
+通过交换i和j维度的循环顺序，以利用数据的空间局部性，提高数据复用率，从而提升运行效率。
+
+### 4.4 编译优化
+
+运行结果：
+
+```bash
+PP0 ) g++ matrix_mul.cpp -O3 -fomit-frame-pointer -march=native -ffast-math -o matrix_mul.out
+PP0 ) ./matrix_mul.out 
+Matrix multiplication took 0.146415 seconds.
+GFLOPS: 14.6671
+```
+
+经过编译优化后，运行效率大大提升。
+
+### 4.5 循环展开
+
+```bash
+PP0 ) g++ matrix_mul.cpp -O3 -fomit-frame-pointer -march=native -ffast-math -o matrix_mul_change_order_unrolled4.out 
+PP0 ) ./matrix_mul_change_order_unrolled4.out 
+Matrix multiplication took 0.143962 seconds.
+GFLOPS: 14.917
+```
+
+可以看到，循环展开后，运行效率略微相较于change order有些许提升。
+
+### 4.6 Intel MKL
+
+```bash
+xiaoma@xiaoma-virtual-machine:~/桌面/Parallel-Programming/PP0$ g++ -o intel_mm.out intel_mm.cpp -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm -ldl
+xiaoma@xiaoma-virtual-machine:~/桌面/Parallel-Programming/PP0$ ./intel_mm.out 
+Matrix multiplication took 0.059867 seconds.
+GFLOPS: 35.8709
+```
+
+可以看到，Intel MKL令运行效率大大提升。只需0.0598s即可完成[1024, 1024]方阵的矩阵相乘。同时，GFLOPS也高达35.8709。
+
+### 4.7 表格对比
+
+| 版本 | 实现描述     | 运行时间 | 相对加速比 | 绝对加速比 | GFLOPS   | 峰值性能百分比 |
+| :--- | ------------ | -------- | ---------- | ---------- | -------- | -------------- |
+| 1    | Python       | 447.659s | 1.0        | 1.0        | 0.002    | 0.0009765625%  |
+| 2    | C/C++        | 4.09568s | 262.1645   | 262.1645   | 0.524329 | 0.2560200195%  |
+| 3    | 调整循环顺序 | 2.78495s | 1.470649   | 385.552    | 0.771104 | 0.3765156249%  |
+| 4    | 编译优化     | 0.14641s | 19.02091   | 7333.549   | 14.6671  | 7.1616699219%  |
+| 5    | 循环展开     | 0.14396s | 1.017038   | 7458.5     | 14.917   | 7.2836914062%  |
+| 6    | Intel MKL    | 0.05986s | 2.404699   | 17935.45   | 35.8709  | 17.515087890%  |
+
+这个表格详细比较了六种不同实现方法对于串行矩阵乘法性能的影响。我们可以逐项分析：
+
+1. **Python实现：**
+   - 执行时间最长（447.659秒），性能最低（GFLOPS为0.002）。
+   - 这是因为Python作为一种解释型语言，执行时的开销比编译型语言大；它还进行动态类型检查，增加了额外的运行时负担。
+2. **C/C++实现：**
+   - 显著减少了执行时间至4.09568秒，GFLOPS提升到0.524329。
+   - C/C++是编译型语言，能够更直接地管理内存和执行，这就减少了运行时的转换和检查，导致性能大幅提升。
+   - C/C++的直接内存访问和控制意味着可以进行更精细的性能优化。
+3. **调整循环顺序的实现：**
+   - 执行时间进一步降低至2.78495秒，GFLOPS提升到0.771104。
+   - 这种优化利用了数据的空间局部性，通过优化数据访问模式以增加缓存命中率，提高效率。
+4. **编译优化：**
+   - 采用编译优化后，执行时间缩短至0.146415秒，GFLOPS急剧上升至14.6671。
+   - 编译器优化如`-O3`、`-march=native`等，通过自动向量化等手段极大地提升了代码效率。
+5. **循环展开：**
+   - 执行时间略微减少至0.143962秒，GFLOPS提升至14.917。
+   - 循环展开通过减少循环次数和增加每次循环的工作量，降低了循环开销，实现了轻微的性能提升。
+6. **Intel MKL库：**
+   - 执行时间最短，仅为0.05986秒，GFLOPS最高，达到了35.8709。
+   - MKL库是专为性能优化而设计的数学库，提供了高度优化的数学函数，特别是矩阵操作，能够充分利用硬件的特性，如SIMD指令集。
+
+总体来说，每一种优化都在不同程度上提高了性能。这从GFLOPS的提升和执行时间的减少可以看出。从编程语言层面到编译优化，再到算法级别的调整和专门的数学库，都是提升性能的重要因素。尤其值得注意的是，硬件加速（通过MKL）提供了巨大的性能提升，这表明在现代高性能计算中，利用专业的库和硬件特性是非常关键的。
+
+## 5 实验感想
+
+在这次的并行程序设计与算法实验中，我深入探讨了串行矩阵乘法的多种实现方式，并对比了它们在性能上的差异。通过本实验，我不仅加深了对矩阵乘法的理解，还学习了如何通过不同的编程技术和优化策略来提高程序的执行效率。
+
+首先，我体会到了编程语言选择对性能的重大影响。比如，用Python实现的矩阵乘法，因其解释性质和动态类型系统，其性能远不如用C++实现的版本。这一点在实验结果中表现得非常明显，Python版本的运行时间远长于C++版本，这让我意识到在处理计算密集型任务时，选择合适的编程语言是多么重要。
+
+此外，我还学习到了多种代码优化技术，如循环展开、编译器优化标志的使用，以及更改循环顺序以利用数据的空间局部性。这些技术都在不同程度上提升了程序的运行效率。特别是编译优化和循环展开，它们让我了解到编译器的强大以及编写高效代码时需要考虑的底层细节。
+
+通过本实验，我还了解到了现代软件开发中常用的一些工具和库，比如Intel MKL。使用这样的库可以极大地简化开发过程，并利用库作者的专业知识来提升程序的性能，这对我来说是一个非常宝贵的学习经验。
+
+总的来说，这次实验不仅仅是对串行矩阵乘法算法的一次实践，更是一次深刻的学习和成长经历。它让我认识到了在软件开发中，理论知识与实践技巧的重要性，以及持续探索和学习新技术的必要性。我期待将这次实验中学到的知识应用到未来的项目中，继续提升自己的技术能力。

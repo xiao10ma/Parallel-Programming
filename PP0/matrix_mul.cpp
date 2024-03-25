@@ -68,7 +68,7 @@ void matrixMultiply_change_order_unrolled4(float *A, float *B, float *C, int m, 
 }
 
 int main() {
-    int m = 512, n = 512, k = 512;
+    int m = 1024, n = 1024, k = 1024;
 
     // 分配一维数组
     float* A = new float[m * n];
