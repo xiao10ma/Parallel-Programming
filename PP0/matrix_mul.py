@@ -27,5 +27,5 @@ def matrix_multiply(m, n, k, low=0, high=10):
 
     return C
 
-m, n, k = 512, 512, 512 # 示例大小
+m, n, k = 1024, 1024, 1024 # 示例大小
 C = matrix_multiply(m, n, k)
