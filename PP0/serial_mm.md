@@ -149,6 +149,8 @@ cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
 
 ## 4. 实验结果
 
+注：本实验的矩阵大小均为1024 * 1024.
+
 ### 4.1 Python
 
 运行结果：
