@@ -1,10 +1,41 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <mpi.h>
+#include <time.h>   
+#include <string.h>
+
+void initialize_matrix(float* matrix, int size, float low, float high) {
+    for (int i = 0; i < size; ++i) {
+        for (int j = 0; j < size; ++j) {
+            // 生成[0, 1)之间的随机浮点数
+            float randomValue = (float)rand() / (float)RAND_MAX;
+            
+            // 调整随机数的范围到[low, high)
+            *(matrix + i * size + j) = low + randomValue * (high - low);
+        }
+    }
+}
+
+
+void matrix_multiply(float* A, float* B, float* C, int size, int avg_rows) {
+    for (int i = 0; i < avg_rows; ++i) {
+        for (int j = 0; j < size; ++j) {
+            float sum = 0;
+            for (int x = 0; x < size; ++x) {
+                sum += *(A + i * size + x) * *(B + x * size + j);
+            }
+            *(C + i * size + j) = sum;
+        }
+    }
+}
 
 int main(){
-    int M = 2048, N = 2048, K = 2048;
-    double  MPI_Start, MPI_End;
+    srand(time(NULL));
+    int N = 128;   // 方阵大小
+
+    float * A, *B, *C, *localA, *localB, *localC;
+    double elapsed = 0.;
+
     int comm_sz, my_rank;
     MPI_Comm comm = MPI_COMM_WORLD;// MPI通信子
     MPI_Init(NULL, NULL);          // 初始化MPI
@@ -12,45 +43,92 @@ int main(){
     MPI_Comm_rank(comm, &my_rank); // 获取进程编号
     MPI_Status status;
 
-    // 本进程开始的行，结束的行，平均前n-2进程计算的行的数量
-    // 最后一个进程计算剩下的大于等于avg_rows小于2*avg_rows行
-    int begin_Arow, end_Arow, avg_rows;
-    if (comm_sz > 1) avg_rows = K / (comm_sz - 1);
+    A = (float *)malloc(sizeof(float) * N * N);
+    B = (float *)malloc(sizeof(float) * N * N);
+    C = (float *)malloc(sizeof(float) * N * N);
+
+    int avg_rows = N;
+    if (comm_sz > 1) 
+        avg_rows = N / comm_sz;
 
     if(my_rank == 0) {
-        for (i = 0; i < comm_sz - 1; i++) {
-            // 判断是不是最后一个进程，是的话把剩的全发过去
-            begin_Arow = avg_rows * i, end_Arow = i + 1 == comm_sz - 1 ? MAX(K, avg_rows * (i + 1)) : avg_rows * (i + 1);
-            // start row 可以计算得出，而最后一个进程的 end row 可能有些不一样，所以额外发送。
-            MPI_Send(&end_Arow, 1, MPI_INT, i + 1, 10, MPI_COMM_WORLD); 
-            MPI_Send(&A[begin_Arow * N], (end_Arow - begin_Arow) * N, MPI_FLOAT, i + 1, 1, MPI_COMM_WORLD); // some rows of matrix A
-            MPI_Send(B, N * K, MPI_FLOAT, i + 1, 2, MPI_COMM_WORLD); // whole matrix B
+        
+        // init mat
+        initialize_matrix(A, N, 0., 10.);
+        initialize_matrix(B, N, 0., 10.);
+        memset(C, 0, sizeof(float) * N * N);
+
+        for (int i = 1; i < comm_sz; i++) {
+            // send avg_rows of matA to [1 to comm_sz - 1] cores respectively, tag = 0
+            MPI_Send(&A[i * avg_rows * N], avg_rows * N, MPI_FLOAT, i, 0, MPI_COMM_WORLD);
+            // send whole matB to [1 to comm_sz] cores respectively, tag = 1
+            MPI_Send(B, N * N, MPI_FLOAT, i, 1, MPI_COMM_WORLD);
         }
-        for (i = 0; i < comm_sz - 1; i++) {
-            begin_Arow = avg_rows * i, end_Arow = i + 1 == comm_sz - 1 ? MAX(K, avg_rows * (i + 1)) : avg_rows * (i + 1);
-            MPI_Recv(&C[begin_Arow * N], (end_Arow - begin_Arow) * K, MPI_FLOAT, i + 1, 3, MPI_COMM_WORLD, &status);
+
+        double local_start, local_end, local_elapsed;
+        MPI_Barrier(MPI_COMM_WORLD);
+        local_start = MPI_Wtime();
+        // Core 0 own mat mul
+        matrix_multiply(A, B, C, N, avg_rows);
+        local_end = MPI_Wtime();
+        local_elapsed = local_end - local_start;
+
+        MPI_Reduce(&local_elapsed, &elapsed, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+
+        for (int i = 1; i < comm_sz; i++) {
+            MPI_Recv(&C[i * avg_rows * N], avg_rows * N, MPI_FLOAT, i, 2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         }
+
+        // for (int i = 0; i < N; i ++) {
+        //     for (int j = 0; j < N; j ++) {
+        //         printf("%f ", A[i * N + j]);
+        //     }
+        //     printf("\n");
+        // }
+
+        // for (int i = 0; i < N; i ++) {
+        //     for (int j = 0; j < N; j ++) {
+        //         printf("%f ", B[i * N + j]);
+        //     }
+        //     printf("\n");
+        // }
+
+        // for (int i = 0; i < N; i ++) {
+        //     for (int j = 0; j < N; j ++) {
+        //         printf("%f ", C[i * N + j]);
+        //     }
+        //     printf("\n");
+        // }
+        printf("Cost time: %f\n", elapsed);
     }   
     else {
-        MPI_Recv(&end_Arow, 1, MPI_INT, 0, 10, MPI_COMM_WORLD, &status);
-        begin_Arow = avg_rows * (my_rank - 1); // end_Arow = MIN(K, avg_rows * (my_rank + 1));
+        localA = (float *)malloc(sizeof(float) * avg_rows * N);
+        localB = (float *)malloc(sizeof(float) * N * N);
+        localC = (float *)malloc(sizeof(float) * avg_rows * N);
 
-        printf("rank%d:\nfrom %d to %d\n", my_rank, begin_Arow, end_Arow);
+        // recive part of A
+        MPI_Recv(localA, avg_rows * N, MPI_FLOAT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        // receive whole B
+        MPI_Recv(localB, N * N, MPI_FLOAT, 0, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        
+        double local_start, local_end, local_elapsed;
+        MPI_Barrier(MPI_COMM_WORLD);
+        local_start = MPI_Wtime();
+        matrix_multiply(localA, localB, localC, N, avg_rows);
+        local_end = MPI_Wtime();
+        local_elapsed = local_end - local_start;
 
-        localA = (float *)malloc(sizeof(float) * (end_Arow - begin_Arow) * N);
-        localB = (float *)malloc(sizeof(float) * N * K);
-        localC = (float *)malloc(sizeof(float) * (end_Arow - begin_Arow) * K);
+        MPI_Reduce(&local_elapsed, &elapsed, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
 
-        MPI_Recv(localA, (end_Arow - begin_Arow) * N, MPI_FLOAT, 0, 1, MPI_COMM_WORLD, &status);
-        MPI_Recv(localB, N * K, MPI_FLOAT, 0, 2, MPI_COMM_WORLD, &status);
-
-        matrix_multiply(end_Arow - begin_Arow, N, K, localA, localB, localC);  // 计算
-
-        MPI_Send(localC, (end_Arow - begin_Arow) * K, MPI_FLOAT, 0, 3, MPI_COMM_WORLD); // 发送结果
+        MPI_Send(localC, avg_rows * N, MPI_FLOAT, 0, 2, MPI_COMM_WORLD); // 发送结果
 
         free(localA);
-        // free(localB);
+        free(localB);
         free(localC);
     }
     MPI_Finalize();
+    free(A);
+    free(B);
+    free(C);
+    return 0;
 }
