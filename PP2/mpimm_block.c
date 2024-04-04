@@ -17,14 +17,14 @@ void initialize_matrix(float* matrix, int size, float low, float high) {
 }
 
 
-void matrix_multiply(float* A, float* B, float* C, int size, int avg_rows) {
-    for (int i = 0; i < avg_rows; ++i) {
-        for (int j = 0; j < size; ++j) {
+void matrix_multiply(float* A, float* B, float* C, int block_rows, int block_cols, int N) {
+    for (int i = 0; i < block_rows; ++i) {
+        for (int j = 0; j < block_cols; ++j) {
             float sum = 0;
-            for (int x = 0; x < size; ++x) {
-                sum += *(A + i * size + x) * *(B + x * size + j);
+            for (int x = 0; x < N; ++x) {
+                sum += *(A + i * N + x) * *(B + x * N + j);
             }
-            *(C + i * size + j) = sum;
+            *(C + i * N + j) = sum;
         }
     }
 }
@@ -33,7 +33,7 @@ int main(){
     srand(time(NULL));
     int N = 256;   // 方阵大小
 
-    float *A, *B, *C, *localA, *localC;
+    float *A, *B, *C, *localA, *localB, *localC;
     double elapsed = 0.;
 
     int comm_sz, my_rank;
@@ -46,12 +46,27 @@ int main(){
     B = (float *)malloc(sizeof(float) * N * N);
     C = (float *)malloc(sizeof(float) * N * N);
 
-    int avg_rows = N;
-    if (comm_sz > 1) 
-        avg_rows = N / comm_sz;
+    int block_rows = N, block_cols = N;
 
-    localA = (float *)malloc(sizeof(float) * avg_rows * N);
-    localC = (float *)malloc(sizeof(float) * avg_rows * N);
+    if (comm_sz == 2) {
+        block_rows = N / 2;
+    }
+    else if (comm_sz == 4) {
+        block_rows = N / 2;
+        block_cols = N / 2;
+    }
+    else if (comm_sz == 8) {
+        block_rows = N / 4;
+        block_cols = N/ 2;
+    }
+    else if (comm_sz == 16) {
+        block_rows = N / 4;
+        block_cols = N / 4;
+    }
+
+    localA = (float *)malloc(sizeof(float) * block_rows * N);
+    localB = (float *)malloc(sizeof(float) * block_cols * N);
+    localC = (float *)malloc(sizeof(float) * block_rows * block_cols);
 
     // send matrix
     if (my_rank == 0) {
@@ -61,9 +76,9 @@ int main(){
         memset(C, 0, sizeof(float) * N * N);
     }
     // scatter A
-    MPI_Scatter(A, N * avg_rows, MPI_FLOAT, localA, N * avg_rows, MPI_FLOAT, 0, MPI_COMM_WORLD);
-    // broadcast B
-    MPI_Bcast(B, N * N, MPI_FLOAT, 0, MPI_COMM_WORLD);
+    MPI_Scatter(A, N * block_rows, MPI_FLOAT, localA, N * block_rows, MPI_FLOAT, 0, MPI_COMM_WORLD);
+    // scatter B
+    MPI_Scatter(B, N * block_cols, MPI_FLOAT, localB, N * block_cols, MPI_FLOAT, 0, MPI_COMM_WORLD);
 
     // matrix multiply and recv
     if (my_rank == 0) {
@@ -71,14 +86,14 @@ int main(){
         MPI_Barrier(MPI_COMM_WORLD);
         local_start = MPI_Wtime();
         // Core 0 own mat mul
-        matrix_multiply(A, B, localC, N, avg_rows);
+        matrix_multiply(localA, localB, localC, block_rows, block_cols, N);
         local_end = MPI_Wtime();
         local_elapsed = local_end - local_start;
 
         MPI_Reduce(&local_elapsed, &elapsed, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
 
         // gather c
-        MPI_Gather(localC, avg_rows * N, MPI_FLOAT, C, avg_rows * N, MPI_FLOAT, 0, MPI_COMM_WORLD);
+        MPI_Gather(localC, block_rows * block_cols, MPI_FLOAT, C, block_rows * block_cols, MPI_FLOAT, 0, MPI_COMM_WORLD);
 
         // for (int i = 0; i < N; i ++) {
         //     for (int j = 0; j < N; j ++) {
@@ -107,15 +122,13 @@ int main(){
         MPI_Barrier(MPI_COMM_WORLD);
         local_start = MPI_Wtime();
         // Core 0 own mat mul
-        matrix_multiply(localA, B, localC, N, avg_rows);
+        matrix_multiply(localA, localB, localC, block_rows, block_cols, N);
         local_end = MPI_Wtime();
         local_elapsed = local_end - local_start;
 
         MPI_Reduce(&local_elapsed, &elapsed, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
         // gather c
-        MPI_Gather(localC, avg_rows * N, MPI_FLOAT, C, avg_rows * N, MPI_FLOAT, 0, MPI_COMM_WORLD);
-
-
+        MPI_Gather(localC, block_rows * block_cols, MPI_FLOAT, C, block_rows * block_cols, MPI_FLOAT, 0, MPI_COMM_WORLD);
     }
 
     MPI_Finalize();
