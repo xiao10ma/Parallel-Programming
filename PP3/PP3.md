@@ -45,3 +45,120 @@ gcc -o myprogram myprogram.c -lpthread
 
 代码见附件或[github](https://github.com/xiao10ma/Parallel-Programming/tree/master/PP3).
 
+首先，先进行一些初始化：
+
+```cpp
+long thread;
+pthread_t* thread_handles;
+
+// 初始化互斥锁和条件变量
+pthread_mutex_init(&mutex, NULL);
+pthread_cond_init(&cond_var, NULL);
+
+A = (float *)malloc(sizeof(float) * N * N);
+B = (float *)malloc(sizeof(float) * N * N);
+C = (float *)malloc(sizeof(float) * N * N);
+
+initialize_matrix(A, N, 0., 10.);
+initialize_matrix(B, N, 0., 10.);
+
+thread_cnt = strtol(argv[1], NULL, 10);
+thread_handles = malloc(thread_cnt * sizeof(pthread_t));
+avg_rows = N / thread_cnt;
+```
+
+
+
+我通过将矩阵A按行分块，矩阵B共享来计算矩阵C。
+
+我们知道Pthreads采用的是共享内存的方式来实现。上述的矩阵乘法，并不会有临界区的情况。每个fork的线程都各自处理各自的数据，没有同时访问一块内存的情况。因此，可以直接fork出`thread_cnt`个线程，每个线程执行各自对应的矩阵乘法。
+
+### 3.1 pthread_create
+
+```cpp
+for (thread = 0; thread < thread_cnt; thread ++) {
+    pthread_create(&thread_handles[thread], NULL, matrix_mul, (void *) thread);
+}
+```
+
+结合`pthread_create()`定义解释：
+
+```cpp
+int pthread_create(
+		pthread_t* 								thread_p									/* out */,
+  	const pthread_attr_t*			attr_p										/* in  */,
+  	void*											(*start_routine)(void*)		/* in  */,
+  	void* 										arg_p											/* in  */);
+```
+
+首先，写一个for循环，从0遍历到thread_cnt-1，总共fork出thread_cnt个线程。pthread_create()第一个参数是一个指针，指向我们初始化已经分配好了的pthread_t对象，通过for循环的thread来索引。第二个参数不用，用NULL表示。接下来，`*start_routine`函数指针，我们传入matrix_mul，表示要并行的函数。而最后一个参数，为每一个线程赋予了唯一的int型参数rank，表示线程的编号。
+
+### 3.2 pthread_joint
+
+同样，既然有fork线程，我们就需要合并线程。
+
+
+
+```cpp
+for (thread = 0; thread < thread_cnt; thread ++) {
+    pthread_join(thread_handles[thread], NULL);
+}
+```
+
+结合`pthread_join()`定义解释：
+
+```cpp
+int pthread_join(
+		pthread_t				thread				/* in  */,
+  	void**					ret_val_p			/* out */);
+```
+
+首先，写一个for循环，从0遍历到thread_cnt - 1，总共fork出thread_cnt个线程。pthread_create()第一个参数表明，我们要合并哪个线程。第二个参数表示接受的返回值，我们不需要返回值，写上NULL。
+
+### 3.3 运行计时
+
+首先，我们需要设置一个barrier让所有进程在同一起跑线，copy自书上：
+
+```cpp
+// Barrier
+pthread_mutex_lock(&mutex);
+counter++;
+if (counter == thread_cnt) {
+    counter = 0;
+    pthread_cond_broadcast(&cond_var);
+}
+else {
+    while (pthread_cond_wait(&cond_var, &mutex) != 0);
+}
+pthread_mutex_unlock(&mutex);
+```
+
+计时，start_time 和 end_time 夹住矩阵相乘：
+
+```cpp
+clock_gettime(CLOCK_MONOTONIC, &start_time);
+for (int i = start_rows; i < end_rows; ++i) {
+    for (int j = 0; j < N; ++j) {
+        float sum = 0;
+        for (int x = 0; x < N; ++x) {
+            sum += *(A + i * N + x) * *(B + x * N + j);
+        }
+        *(C + i * N + j) = sum;
+    }
+}
+clock_gettime(CLOCK_MONOTONIC, &end_time);
+```
+
+在同步时间时，需要有互斥锁，因为访问的是同一个共享变量：
+
+```cpp
+// 更新全局最大时间
+pthread_mutex_lock(&max_time_mutex); // 锁定互斥锁以安全更新
+if (elapsed_time > max_elapsed_time) {
+    max_elapsed_time = elapsed_time; // 更新最大时间
+}
+pthread_mutex_unlock(&max_time_mutex); // 解锁互斥锁
+```
+
+## 4. 实验结果
+
