@@ -196,15 +196,15 @@ N = 512
 
 ```bash
 ❯ ./mm.out 1
-Max elapsed time among all threads: 0.079238 seconds.
+Max elapsed time among all threads: 0.481108 seconds.
 ❯ ./mm.out 2
-Max elapsed time among all threads: 0.046357 seconds.
+Max elapsed time among all threads: 0.260021 seconds.
 ❯ ./mm.out 4
-Max elapsed time among all threads: 0.027290 seconds.
+Max elapsed time among all threads: 0.146547 seconds.
 ❯ ./mm.out 8
-Max elapsed time among all threads: 0.014778 seconds.
+Max elapsed time among all threads: 0.089492 seconds.
 ❯ ./mm.out 16
-Max elapsed time among all threads: 0.012779 seconds.
+Max elapsed time among all threads: 0.092121 seconds.
 ```
 
 N = 1024
@@ -236,4 +236,16 @@ Max elapsed time among all threads: 10.331040 seconds.
 ❯ ./mm.out 16
 Max elapsed time among all threads: 9.993411 seconds.
 ```
+
+绘制成表格：
+
+| P\N  | 128      | 256      | 512      | 1024     | 2048      |
+| ---- | -------- | -------- | -------- | -------- | --------- |
+| 1    | 0.013769 | 0.084312 | 0.481108 | 3.753396 | 32.983432 |
+| 2    | 0.007233 | 0.050017 | 0.260021 | 1.961918 | 17.653807 |
+| 4    | 0.003861 | 0.025685 | 0.146547 | 1.042281 | 10.603551 |
+| 8    | 0.001570 | 0.016018 | 0.089492 | 0.903420 | 10.331040 |
+| 16   | 0.001096 | 0.008387 | 0.092121 | 0.849642 | 9.993411  |
+
+可视化：
 
