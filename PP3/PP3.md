@@ -97,7 +97,7 @@ int pthread_create(
 
 同样，既然有fork线程，我们就需要合并线程。
 
-
+![](https://github.com/xiao10ma/Parallel-Programming/blob/master/PP3/WechatIMG224.jpg?raw=true)
 
 ```cpp
 for (thread = 0; thread < thread_cnt; thread ++) {
@@ -161,4 +161,79 @@ pthread_mutex_unlock(&max_time_mutex); // 解锁互斥锁
 ```
 
 ## 4. 实验结果
+
+N = 128
+
+```bash
+❯ ./mm.out 1
+Max elapsed time among all threads: 0.013769 seconds.
+❯ ./mm.out 2
+Max elapsed time among all threads: 0.007233 seconds.
+❯ ./mm.out 4
+Max elapsed time among all threads: 0.003861 seconds.
+❯ ./mm.out 8
+Max elapsed time among all threads: 0.001570 seconds.
+❯ ./mm.out 16
+Max elapsed time among all threads: 0.001096 seconds.
+```
+
+N = 256
+
+```bash
+❯ ./mm.out 1
+Max elapsed time among all threads: 0.084312 seconds.
+❯ ./mm.out 2
+Max elapsed time among all threads: 0.050017 seconds.
+❯ ./mm.out 4
+Max elapsed time among all threads: 0.025685 seconds.
+❯ ./mm.out 8
+Max elapsed time among all threads: 0.016018 seconds.
+❯ ./mm.out 16
+Max elapsed time among all threads: 0.008387 seconds.
+```
+
+N = 512
+
+```bash
+❯ ./mm.out 1
+Max elapsed time among all threads: 0.079238 seconds.
+❯ ./mm.out 2
+Max elapsed time among all threads: 0.046357 seconds.
+❯ ./mm.out 4
+Max elapsed time among all threads: 0.027290 seconds.
+❯ ./mm.out 8
+Max elapsed time among all threads: 0.014778 seconds.
+❯ ./mm.out 16
+Max elapsed time among all threads: 0.012779 seconds.
+```
+
+N = 1024
+
+```bash
+❯ ./mm.out 1
+Max elapsed time among all threads: 3.753396 seconds.
+❯ ./mm.out 2
+Max elapsed time among all threads: 1.961918 seconds.
+❯ ./mm.out 4
+Max elapsed time among all threads: 1.042281 seconds.
+❯ ./mm.out 8
+Max elapsed time among all threads: 0.903420 seconds.
+❯ ./mm.out 16
+Max elapsed time among all threads: 0.849642 seconds.
+```
+
+N = 2048
+
+```bash
+❯ ./mm.out 1
+Max elapsed time among all threads: 32.983432 seconds.
+❯ ./mm.out 2
+Max elapsed time among all threads: 17.653807 seconds.
+❯ ./mm.out 4
+Max elapsed time among all threads: 10.603551 seconds.
+❯ ./mm.out 8
+Max elapsed time among all threads: 10.331040 seconds.
+❯ ./mm.out 16
+Max elapsed time among all threads: 9.993411 seconds.
+```
 

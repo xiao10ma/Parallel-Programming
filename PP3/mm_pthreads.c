@@ -5,7 +5,7 @@
 
 long thread_cnt;
 float* A, *B, *C;
-const long N = 256;
+const long N = 2048;
 long avg_rows;
 
 int counter;

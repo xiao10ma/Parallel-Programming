@@ -1,3 +1,4 @@
 *.out
 *.json
 .DS_Store
+mm.out.dSYM/
