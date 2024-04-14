@@ -43,4 +43,5 @@ gcc -o myprogram myprogram.c -lpthread
 
 ## 3. Pthreads实现矩阵乘法
 
-代码见附件或github
+代码见附件或[github](https://github.com/xiao10ma/Parallel-Programming/tree/master/PP3).
+

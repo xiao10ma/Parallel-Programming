@@ -44,22 +44,17 @@ int main(int argc, char* argv[]) {
     pthread_t* thread_handles;
     pthread_mutex_init(&mutex, NULL);
 
-    thread_cnt = strtol(argv[1], NULL, 10);
+    thread_cnt = strtol(argv[1], NULL, N);
     thread_handles = malloc(thread_cnt * sizeof(pthread_t));
     avg_len = N / thread_cnt;
 
     A = (float *)malloc(sizeof(float) * N);
     initialize_array(A, 10);
     
-    
-    
     for (thread = 0; thread < thread_cnt; thread ++) {
         pthread_create(&thread_handles[thread], NULL, array_sum, (void *) thread);
     }
     
-
-
-
     for (thread = 0; thread < thread_cnt; thread ++) {
         pthread_join(thread_handles[thread], NULL);
     }
