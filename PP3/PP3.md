@@ -249,3 +249,8 @@ Max elapsed time among all threads: 9.993411 seconds.
 
 可视化：
 
+![](https://github.com/xiao10ma/Parallel-Programming/blob/master/PP3/Figure_1.png?raw=true)
+
+## 5. Pthread实现数组求和
+
+### 5.1 
