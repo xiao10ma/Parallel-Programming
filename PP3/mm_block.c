@@ -5,8 +5,8 @@
 
 long thread_cnt;
 float* A, *B, *C;
-const long N = 128;
-long avg_rows;
+const long N = 2048;
+long block_rows = N, block_cols = N;
 
 int counter;
 pthread_mutex_t mutex;
@@ -29,8 +29,11 @@ void initialize_matrix(float* matrix, int size, float low, float high) {
 
 void *matrix_mul(void* rank) {
     long my_rank = (long) rank;
-    long start_rows = my_rank * avg_rows;
-    long end_rows = (my_rank + 1) * avg_rows;
+    long start_row = my_rank * block_rows;
+    long end_row = (my_rank + 1) * block_rows;
+
+    long start_col = my_rank * block_cols;
+    long end_col = (my_rank + 1) * block_cols;
 
     struct timespec start_time, end_time;
     double elapsed_time;
@@ -47,8 +50,8 @@ void *matrix_mul(void* rank) {
     }
     pthread_mutex_unlock(&mutex);
     clock_gettime(CLOCK_MONOTONIC, &start_time);
-    for (int i = start_rows; i < end_rows; ++i) {
-        for (int j = 0; j < N; ++j) {
+    for (int i = start_row; i < end_row; ++i) {
+        for (int j = start_col; j < end_col; ++j) {
             float sum = 0;
             for (int x = 0; x < N; ++x) {
                 sum += *(A + i * N + x) * *(B + x * N + j);
@@ -88,7 +91,22 @@ int main(int argc, char* argv[]) {
 
     thread_cnt = strtol(argv[1], NULL, 10);
     thread_handles = malloc(thread_cnt * sizeof(pthread_t));
-    avg_rows = N / thread_cnt;
+    
+    if (thread_cnt == 2) {
+        block_rows = N / 2;
+    }
+    else if (thread_cnt == 4) {
+        block_rows = N / 2;
+        block_cols = N / 2;
+    }
+    else if (thread_cnt == 8) {
+        block_rows = N / 4;
+        block_cols = N/ 2;
+    }
+    else if (thread_cnt == 16) {
+        block_rows = N / 4;
+        block_cols = N / 4;
+    }
 
     for (thread = 0; thread < thread_cnt; thread ++) {
         pthread_create(&thread_handles[thread], NULL, matrix_mul, (void *) thread);

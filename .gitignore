@@ -2,3 +2,5 @@
 *.json
 .DS_Store
 mm.out.dSYM/
+mm_block.dSYM/
+as.out.dSYM/

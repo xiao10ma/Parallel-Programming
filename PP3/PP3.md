@@ -160,7 +160,7 @@ if (elapsed_time > max_elapsed_time) {
 pthread_mutex_unlock(&max_time_mutex); // 解锁互斥锁
 ```
 
-## 4. 实验结果
+## 4. 通用矩阵乘法实验结果
 
 N = 128
 
@@ -251,6 +251,319 @@ Max elapsed time among all threads: 9.993411 seconds.
 
 ![](https://github.com/xiao10ma/Parallel-Programming/blob/master/PP3/Figure_1.png?raw=true)
 
-## 5. Pthread实现数组求和
+## 5. 分块矩阵乘法实现
 
-### 5.1 
+算法原理与上次MPI作业实现分块矩阵乘法基本类似。简短概括，我们可以将A矩阵拆成a个子矩阵，对应于(block_row = N / a)行N列的一个矩阵；将B矩阵拆成b个子矩阵，对应于(block_col = N / b)列N行的一个矩阵，即：
+$$
+A B=\left[\begin{array}{c}
+A_0 \\
+A_1 \\
+\vdots \\
+A_{a-1}
+\end{array}\right]\left[\begin{array}{llll}
+B_0 & B_1 & \cdots & B_{b-1}
+\end{array}\right]=\left[\begin{array}{cccc}
+A_0 B_0 & A_0 B_1 & \cdots & A_0 B_{b-1} \\
+A_1 B_0 & A_1 B_1 & \cdots & A_1 B_{b-1} \\
+\vdots & & \ddots & A_0 B_{b-1} \\
+A_{a-1} B_0 & A_{a-1} B_1 & \cdots & A_{a-1} B_{b-1}
+\end{array}\right]
+$$
+
+
+实现方式：
+
+将可用于计算的进程数（thread_cnt）分解为a*b，然后将矩阵A全体行划分为a个部分，矩阵B全体列划分为b个部分，从而将整个矩阵划分为size相同的（thread_cnt）个块。每个子进程负责计算最终结果的一块。由于通用矩阵乘法的实现中，整个矩阵B都参与了运算，因此考虑到cache的空间局部性原理，分块矩阵乘法应该是要比通用矩阵乘法快上一些的。
+
+### 5.1 代码实现
+
+首先，根据thread_cnt确认每个线程需要处理的矩阵A和矩阵B大小：
+
+```cpp
+if (thread_cnt == 2) {
+    block_rows = N / 2;
+}
+else if (thread_cnt == 4) {
+    block_rows = N / 2;
+    block_cols = N / 2;
+}
+else if (thread_cnt == 8) {
+    block_rows = N / 4;
+    block_cols = N/ 2;
+}
+else if (thread_cnt == 16) {
+    block_rows = N / 4;
+    block_cols = N / 4;
+}
+```
+
+根据分块的大小，得到每个thread需要处理的矩阵范围：
+
+```cpp
+long start_row = my_rank * block_rows;
+long end_row = (my_rank + 1) * block_rows;
+
+long start_col = my_rank * block_cols;
+long end_col = (my_rank + 1) * block_cols;
+```
+
+根据已经确定的矩阵范围，执行乘法：
+
+```cpp
+for (int i = start_row; i < end_row; ++i) {
+    for (int j = start_col; j < end_col; ++j) {
+        float sum = 0;
+        for (int x = 0; x < N; ++x) {
+            sum += *(A + i * N + x) * *(B + x * N + j);
+        }
+        *(C + i * N + j) = sum;
+    }
+}
+```
+
+## 6. 分块矩阵乘法实验结果
+
+N = 128
+
+```bash
+❯ ./mm_block.out 1
+Max elapsed time among all threads: 0.014830 seconds.
+❯ ./mm_block.out 2
+Max elapsed time among all threads: 0.008628 seconds.
+❯ ./mm_block.out 4
+Max elapsed time among all threads: 0.005661 seconds.
+❯ ./mm_block.out 8
+Max elapsed time among all threads: 0.001791 seconds.
+❯ ./mm_block.out 16
+Max elapsed time among all threads: 0.001080 seconds.
+```
+
+N = 256
+
+```bash
+❯ ./mm_block.out 1
+Max elapsed time among all threads: 0.088521 seconds.
+❯ ./mm_block.out 2
+Max elapsed time among all threads: 0.051135 seconds.
+❯ ./mm_block.out 4
+Max elapsed time among all threads: 0.031025 seconds.
+❯ ./mm_block.out 8
+Max elapsed time among all threads: 0.018194 seconds.
+❯ ./mm_block.out 16
+Max elapsed time among all threads: 0.008349 seconds.
+```
+
+N = 512
+
+```bash
+❯ ./mm_block.out 1
+Max elapsed time among all threads: 0.486692 seconds.
+❯ ./mm_block.out 2
+Max elapsed time among all threads: 0.249893 seconds.
+❯ ./mm_block.out 4
+Max elapsed time among all threads: 0.133712 seconds.
+❯ ./mm_block.out 8
+Max elapsed time among all threads: 0.093087 seconds.
+❯ ./mm_block.out 16
+Max elapsed time among all threads: 0.083458 seconds.
+```
+
+N = 1024
+
+```bash
+❯ ./mm_block.out 1
+Max elapsed time among all threads: 3.700232 seconds.
+❯ ./mm_block.out 2
+Max elapsed time among all threads: 1.947231 seconds.
+❯ ./mm_block.out 4
+Max elapsed time among all threads: 1.020938 seconds.
+❯ ./mm_block.out 8
+Max elapsed time among all threads: 0.864890 seconds.
+❯ ./mm_block.out 16
+Max elapsed time among all threads: 0.838746 seconds.
+```
+
+N = 2048
+
+```bash
+❯ ./mm_block.out 1
+Max elapsed time among all threads: 32.724529 seconds.
+❯ ./mm_block.out 2
+Max elapsed time among all threads: 17.917027 seconds.
+❯ ./mm_block.out 4
+Max elapsed time among all threads: 10.302597 seconds.
+❯ ./mm_block.out 8
+Max elapsed time among all threads: 10.231490 seconds.
+❯ ./mm_block.out 16
+Max elapsed time among all threads: 9.894151 seconds.
+```
+
+## 7. Pthread实现数组求和
+
+### 7.1 pthread_create和pthread_join
+
+```cpp
+for (thread = 0; thread < thread_cnt; thread ++) {
+    pthread_create(&thread_handles[thread], NULL, array_sum, (void *) thread);
+}
+
+for (thread = 0; thread < thread_cnt; thread ++) {
+    pthread_join(thread_handles[thread], NULL);
+}
+```
+
+与矩阵乘法极为相似，不过多赘述。
+
+### 7.2 array sum
+
+```cpp
+void *array_sum(void* rank) {
+    long my_rank = (long) rank;
+    long start_ind = my_rank * avg_len;
+    long end_ind = (my_rank + 1) * avg_len;
+
+    float local_sum = 0;
+    for (int i = start_ind; i < end_ind; i ++) {
+        local_sum += A[i];
+    }
+
+    pthread_mutex_lock(&mutex);
+    sum += local_sum;
+    pthread_mutex_unlock(&mutex);
+
+    return NULL;
+}
+```
+
+首先，先将自己进程中的A[i]相加求和，得到局部和local_sum。然后降其加到共享变量中。然而，由于共享的缘故，我们必须互斥地访问改变量。因此，需要有一个互斥锁来保证互斥访问。
+
+## 8. 实验结果
+
+N = 1M
+
+```bash
+❯ ./as.out 1
+Cost time: 0.000017
+❯ ./as.out 2
+Cost time: 0.000020
+❯ ./as.out 4
+Cost time: 0.000017
+❯ ./as.out 8
+Cost time: 0.000024
+❯ ./as.out 16
+Cost time: 0.000024
+```
+
+N = 2M
+
+```bash
+❯ ./as.out 1
+Cost time: 0.000025
+❯ ./as.out 2
+Cost time: 0.000020
+❯ ./as.out 4
+Cost time: 0.000025
+❯ ./as.out 8
+Cost time: 0.000021
+❯ ./as.out 16
+Cost time: 0.000020
+```
+
+N = 4M
+
+```bash
+❯ ./as.out 1
+Cost time: 0.000041
+❯ ./as.out 2
+Cost time: 0.000025
+❯ ./as.out 4
+Cost time: 0.000021
+❯ ./as.out 8
+Cost time: 0.000023
+❯ ./as.out 16
+Cost time: 0.000016
+```
+
+N = 8M
+
+```bash
+❯ ./as.out 1
+Cost time: 0.000036
+❯ ./as.out 2
+Cost time: 0.000020
+❯ ./as.out 4
+Cost time: 0.000021
+❯ ./as.out 8
+Cost time: 0.000020
+❯ ./as.out 16
+Cost time: 0.000020
+```
+
+N = 16M
+
+```bash
+❯ ./as.out 1
+Cost time: 0.000042
+❯ ./as.out 2
+Cost time: 0.000020
+❯ ./as.out 4
+Cost time: 0.000025
+❯ ./as.out 8
+Cost time: 0.000024
+❯ ./as.out 16
+Cost time: 0.000019
+```
+
+N = 32M
+
+```bash
+❯ ./as.out 1
+Cost time: 0.000026
+❯ ./as.out 2
+Cost time: 0.000019
+❯ ./as.out 4
+Cost time: 0.000021
+❯ ./as.out 8
+Cost time: 0.000025
+❯ ./as.out 16
+Cost time: 0.000024
+```
+
+N = 64M
+
+```bash
+❯ ./as.out 1
+Cost time: 0.000022
+❯ ./as.out 2
+Cost time: 0.000021
+❯ ./as.out 4
+Cost time: 0.000015
+❯ ./as.out 8
+Cost time: 0.000022
+❯ ./as.out 16
+Cost time: 0.000025
+```
+
+N = 128M
+
+```bash
+❯ ./as.out 1
+Cost time: 0.000032
+❯ ./as.out 2
+Cost time: 0.000030
+❯ ./as.out 4
+Cost time: 0.000027
+❯ ./as.out 8
+Cost time: 0.000029
+❯ ./as.out 16
+Cost time: 0.000035
+```
+
+| P\N  | 1M   | 2M   | 4M   | 8M   | 16M  | 32M  | 64M  | 128M |
+| ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- |
+| 1    | 17   | 25   | 41   | 36   | 42   | 26   | 22   | 32   |
+| 2    | 20   | 20   | 25   | 20   | 20   | 19   | 21   | 30   |
+| 4    | 17   | 25   | 21   | 21   | 25   | 21   | 15   | 27   |
+| 8    | 24   | 21   | 23   | 20   | 24   | 25   | 22   | 29   |
+| 16   | 24   | 20   | 16   | 20   | 19   | 24   | 25   | 35   |
+

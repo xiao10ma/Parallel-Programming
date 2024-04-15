@@ -5,7 +5,7 @@
 
 long thread_cnt;
 float* A;
-const long N = 1280 * 1000000;
+const long N = 128 * 1000000;
 long avg_len;
 float sum = 0.;
 
@@ -61,7 +61,7 @@ int main(int argc, char* argv[]) {
 
     gettimeofday(&end, NULL); // 计时结束
     double time_spent = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1000000.0;
-    printf("Cost time: %f", time_spent);
+    printf("Cost time: %f\n", time_spent);
     
     free(thread_handles);
     free(A);
