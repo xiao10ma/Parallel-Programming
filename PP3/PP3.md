@@ -457,127 +457,167 @@ N = 1M
 
 ```bash
 ❯ ./as.out 1
-Cost time: 0.000017
+Total sum: 49483647
+Cost time: 0.002609 seconds
 ❯ ./as.out 2
-Cost time: 0.000020
+Total sum: 49483647
+Cost time: 0.001175 seconds
 ❯ ./as.out 4
-Cost time: 0.000017
+Total sum: 49483647
+Cost time: 0.000794 seconds
 ❯ ./as.out 8
-Cost time: 0.000024
+Total sum: 49483647
+Cost time: 0.000637 seconds
 ❯ ./as.out 16
-Cost time: 0.000024
+Total sum: 49483647
+Cost time: 0.000507 seconds
 ```
 
 N = 2M
 
 ```bash
 ❯ ./as.out 1
-Cost time: 0.000025
+Total sum: 98971657
+Cost time: 0.003239 seconds
 ❯ ./as.out 2
-Cost time: 0.000020
+Total sum: 98971657
+Cost time: 0.001655 seconds
 ❯ ./as.out 4
-Cost time: 0.000025
+Total sum: 98971657
+Cost time: 0.001380 seconds
 ❯ ./as.out 8
-Cost time: 0.000021
+Total sum: 98971657
+Cost time: 0.000956 seconds
 ❯ ./as.out 16
-Cost time: 0.000020
+Total sum: 98971657
+Cost time: 0.000874 seconds
 ```
 
 N = 4M
 
 ```bash
 ❯ ./as.out 1
-Cost time: 0.000041
+Total sum: 198025019
+Cost time: 0.005645 seconds
 ❯ ./as.out 2
-Cost time: 0.000025
+Total sum: 198025019
+Cost time: 0.002686 seconds
 ❯ ./as.out 4
-Cost time: 0.000021
+Total sum: 198025019
+Cost time: 0.001656 seconds
 ❯ ./as.out 8
-Cost time: 0.000023
+Total sum: 198025019
+Cost time: 0.001593 seconds
 ❯ ./as.out 16
-Cost time: 0.000016
+Total sum: 198025019
+Cost time: 0.001135 seconds
 ```
 
 N = 8M
 
 ```bash
 ❯ ./as.out 1
-Cost time: 0.000036
+Total sum: 396047077
+Cost time: 0.008607 seconds
 ❯ ./as.out 2
-Cost time: 0.000020
+Total sum: 396047077
+Cost time: 0.004442 seconds
 ❯ ./as.out 4
-Cost time: 0.000021
+Total sum: 396047077
+Cost time: 0.002432 seconds
 ❯ ./as.out 8
-Cost time: 0.000020
+Total sum: 396047077
+Cost time: 0.002071 seconds
 ❯ ./as.out 16
-Cost time: 0.000020
+Total sum: 396047077
+Cost time: 0.001857 seconds
 ```
 
 N = 16M
 
 ```bash
 ❯ ./as.out 1
-Cost time: 0.000042
+Total sum: 792011723
+Cost time: 0.017711 seconds
 ❯ ./as.out 2
-Cost time: 0.000020
+Total sum: 792011723
+Cost time: 0.008411 seconds
 ❯ ./as.out 4
-Cost time: 0.000025
+Total sum: 792011723
+Cost time: 0.005225 seconds
 ❯ ./as.out 8
-Cost time: 0.000024
+Total sum: 792011723
+Cost time: 0.004062 seconds
 ❯ ./as.out 16
-Cost time: 0.000019
+Total sum: 792011723
+Cost time: 0.004248 seconds
 ```
 
 N = 32M
 
 ```bash
 ❯ ./as.out 1
-Cost time: 0.000026
+Total sum: 1584318480
+Cost time: 0.034818 seconds
 ❯ ./as.out 2
-Cost time: 0.000019
+Total sum: 1584318480
+Cost time: 0.017545 seconds
 ❯ ./as.out 4
-Cost time: 0.000021
+Total sum: 1584318480
+Cost time: 0.009814 seconds
 ❯ ./as.out 8
-Cost time: 0.000025
+Total sum: 1584318480
+Cost time: 0.008950 seconds
 ❯ ./as.out 16
-Cost time: 0.000024
+Total sum: 1584318480
+Cost time: 0.007547 seconds
 ```
 
 N = 64M
 
 ```bash
 ❯ ./as.out 1
-Cost time: 0.000022
+Total sum: 3168123411
+Cost time: 0.070977 seconds
 ❯ ./as.out 2
-Cost time: 0.000021
+Total sum: 3168123411
+Cost time: 0.038256 seconds
 ❯ ./as.out 4
-Cost time: 0.000015
+Total sum: 3168123411
+Cost time: 0.020395 seconds
 ❯ ./as.out 8
-Cost time: 0.000022
+Total sum: 3168123411
+Cost time: 0.016129 seconds
 ❯ ./as.out 16
-Cost time: 0.000025
+Total sum: 3168123411
+Cost time: 0.015611 seconds
 ```
 
 N = 128M
 
 ```bash
 ❯ ./as.out 1
-Cost time: 0.000032
+Total sum: 6336129725
+Cost time: 0.143842 seconds
 ❯ ./as.out 2
-Cost time: 0.000030
+Total sum: 6336129725
+Cost time: 0.067061 seconds
 ❯ ./as.out 4
-Cost time: 0.000027
+Total sum: 6336129725
+Cost time: 0.039102 seconds
 ❯ ./as.out 8
-Cost time: 0.000029
+Total sum: 6336129725
+Cost time: 0.030899 seconds
 ❯ ./as.out 16
-Cost time: 0.000035
+Total sum: 6336129725
+Cost time: 0.029182 seconds
 ```
 
-| P\N  | 1M   | 2M   | 4M   | 8M   | 16M  | 32M  | 64M  | 128M |
-| ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- |
-| 1    | 17   | 25   | 41   | 36   | 42   | 26   | 22   | 32   |
-| 2    | 20   | 20   | 25   | 20   | 20   | 19   | 21   | 30   |
-| 4    | 17   | 25   | 21   | 21   | 25   | 21   | 15   | 27   |
-| 8    | 24   | 21   | 23   | 20   | 24   | 25   | 22   | 29   |
-| 16   | 24   | 20   | 16   | 20   | 19   | 24   | 25   | 35   |
+| P\N  | 1M       | 2M       | 4M       | 8M       | 16M      | 32M      | 64M      | 128M     |
+| ---- | -------- | -------- | -------- | -------- | -------- | -------- | -------- | -------- |
+| 1    | 0.002609 | 0.003239 | 0.005645 | 0.008607 | 0.017711 | 0.034818 | 0.070977 | 0.143842 |
+| 2    | 0.001175 | 0.001655 | 0.002686 | 0.004442 | 0.008411 | 0.017545 | 0.038256 | 0.067061 |
+| 4    | 0.000794 | 0.001380 | 0.001656 | 0.002432 | 0.005225 | 0.009814 | 0.020395 | 0.039102 |
+| 8    | 0.000637 | 0.000956 | 0.001593 | 0.002071 | 0.004062 | 0.008950 | 0.016129 | 0.030899 |
+| 16   | 0.000507 | 0.000874 | 0.001135 | 0.001857 | 0.004248 | 0.007547 | 0.015611 | 0.029182 |
 
