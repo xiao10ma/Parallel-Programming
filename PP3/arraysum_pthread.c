@@ -6,7 +6,7 @@
 
 typedef long long ll;
 
-ll N = 8 * 1000000;
+ll N = 1 * 1000000;
 ll thread_cnt;
 
 typedef struct {
@@ -52,7 +52,7 @@ int main(int argc, char* argv[]) {
     }
 
     ll total_sum = 0;
-    // 
+
     for (thread = 0; thread < thread_cnt; thread++) {
         pthread_join(thread_handles[thread], NULL);
         total_sum += threadData[thread].result; 
@@ -65,5 +65,6 @@ int main(int argc, char* argv[]) {
     printf("Cost time: %f seconds\n", time_taken);
 
     free(array);
-    return EXIT_SUCCESS;
+    free(thread_handles);
+    return 0;
 }

@@ -249,7 +249,7 @@ Max elapsed time among all threads: 9.993411 seconds.
 
 可视化：
 
-![](https://github.com/xiao10ma/Parallel-Programming/blob/master/PP3/Figure_1.png?raw=true)
+<img src="https://github.com/xiao10ma/Parallel-Programming/blob/master/PP3/Figure_1.png?raw=true" style="zoom:67%;" />
 
 ## 5. 分块矩阵乘法实现
 
@@ -410,18 +410,21 @@ Max elapsed time among all threads: 9.894151 seconds.
 
 可视化：
 
-![](https://github.com/xiao10ma/Parallel-Programming/blob/master/PP3/Figure_2.png?raw=true)
+<img src="https://github.com/xiao10ma/Parallel-Programming/blob/master/PP3/Figure_2.png?raw=true" style="zoom:67%;" />
 
 ## 7. Pthread实现数组求和
 
 ### 7.1 pthread_create和pthread_join
 
 ```cpp
-for (thread = 0; thread < thread_cnt; thread ++) {
-    pthread_create(&thread_handles[thread], NULL, array_sum, (void *) thread);
+for (thread = 0; thread < thread_cnt; thread++) {
+    threadData[thread].array = array;
+    threadData[thread].start = thread * length_per_thread;
+    threadData[thread].end = (thread + 1) * length_per_thread;
+    pthread_create(&thread_handles[thread], NULL, sum_array, (void*)&threadData[thread]);
 }
 
-for (thread = 0; thread < thread_cnt; thread ++) {
+for (thread = 0; thread < thread_cnt; thread++) {
     pthread_join(thread_handles[thread], NULL);
 }
 ```
@@ -431,20 +434,16 @@ for (thread = 0; thread < thread_cnt; thread ++) {
 ### 7.2 array sum
 
 ```cpp
-void *array_sum(void* rank) {
-    long my_rank = (long) rank;
-    long start_ind = my_rank * avg_len;
-    long end_ind = (my_rank + 1) * avg_len;
-
-    float local_sum = 0;
-    for (int i = start_ind; i < end_ind; i ++) {
-        local_sum += A[i];
+void* sum_array(void* arg) {
+    ThreadData* data = (ThreadData*)arg;
+    long long sum = 0;
+    for (long long i = data->start; i < data->end; i++) {
+        sum += data->array[i];
     }
-
+    
     pthread_mutex_lock(&mutex);
-    sum += local_sum;
+    global_sum += sum;
     pthread_mutex_unlock(&mutex);
-
     return NULL;
 }
 ```
@@ -452,6 +451,180 @@ void *array_sum(void* rank) {
 首先，先将自己进程中的A[i]相加求和，得到局部和local_sum。然后降其加到共享变量中。然而，由于共享的缘故，我们必须互斥地访问改变量。因此，需要有一个互斥锁来保证互斥访问。
 
 ## 8. 实验结果
+
+N = 1M
+
+```bash
+❯ ./as.out 1
+Total sum: 49483647
+Cost time: 0.001771 seconds
+❯ ./as.out 2
+Total sum: 49483647
+Cost time: 0.000794 seconds
+❯ ./as.out 4
+Total sum: 49483647
+Cost time: 0.000377 seconds
+❯ ./as.out 8
+Total sum: 49483647
+Cost time: 0.000599 seconds
+❯ ./as.out 16
+Total sum: 49483647
+Cost time: 0.000664 seconds
+```
+
+N = 2M
+
+```bash
+❯ ./as.out 1
+Total sum: 98971657
+Cost time: 0.003424 seconds
+❯ ./as.out 2
+Total sum: 98971657
+Cost time: 0.001792 seconds
+❯ ./as.out 4
+Total sum: 98971657
+Cost time: 0.000795 seconds
+❯ ./as.out 8
+Total sum: 98971657
+Cost time: 0.000985 seconds
+❯ ./as.out 16
+Total sum: 98971657
+Cost time: 0.000816 seconds
+```
+
+N = 4M
+
+```bash
+❯ ./as.out 1
+Total sum: 198025019
+Cost time: 0.005634 seconds
+❯ ./as.out 2
+Total sum: 198025019
+Cost time: 0.002740 seconds
+❯ ./as.out 4
+Total sum: 198025019
+Cost time: 0.001475 seconds
+❯ ./as.out 8
+Total sum: 198025019
+Cost time: 0.001373 seconds
+❯ ./as.out 16
+Total sum: 198025019
+Cost time: 0.001206 seconds
+```
+
+N = 8M
+
+```bash
+❯ ./as.out 1
+Total sum: 396047077
+Cost time: 0.008436 seconds
+❯ ./as.out 2
+Total sum: 396047077
+Cost time: 0.004492 seconds
+❯ ./as.out 4
+Total sum: 396047077
+Cost time: 0.002281 seconds
+❯ ./as.out 8
+Total sum: 396047077
+Cost time: 0.001943 seconds
+❯ ./as.out 16
+Total sum: 396047077
+Cost time: 0.001930 seconds
+```
+
+N = 16M
+
+```bash
+❯ ./as.out 1
+Total sum: 792011723
+Cost time: 0.017006 seconds
+❯ ./as.out 2
+Total sum: 792011723
+Cost time: 0.008234 seconds
+❯ ./as.out 4
+Total sum: 792011723
+Cost time: 0.004939 seconds
+❯ ./as.out 8
+Total sum: 792011723
+Cost time: 0.004415 seconds
+❯ ./as.out 16
+Total sum: 792011723
+Cost time: 0.003793 seconds
+```
+
+N = 32M
+
+```bash
+❯ ./as.out 1
+Total sum: 1584318480
+Cost time: 0.035475 seconds
+❯ ./as.out 2
+Total sum: 1584318480
+Cost time: 0.017141 seconds
+❯ ./as.out 4
+Total sum: 1584318480
+Cost time: 0.009986 seconds
+❯ ./as.out 8
+Total sum: 1584318480
+Cost time: 0.007589 seconds
+❯ ./as.out 16
+Total sum: 1584318480
+Cost time: 0.007616 seconds
+```
+
+N = 64M
+
+```bash
+❯ ./as.out 1
+Total sum: 3168123411
+Cost time: 0.074379 seconds
+❯ ./as.out 2
+Total sum: 3168123411
+Cost time: 0.033816 seconds
+❯ ./as.out 4
+Total sum: 3168123411
+Cost time: 0.018382 seconds
+❯ ./as.out 8
+Total sum: 3168123411
+Cost time: 0.016177 seconds
+❯ ./as.out 16
+Total sum: 3168123411
+Cost time: 0.015637 seconds
+```
+
+N = 128M
+
+```bash
+❯ ./as.out 1
+Total sum: 6336129725
+Cost time: 0.145537 seconds
+❯ ./as.out 2
+Total sum: 6336129725
+Cost time: 0.075687 seconds
+❯ ./as.out 4
+Total sum: 6336129725
+Cost time: 0.036094 seconds
+❯ ./as.out 8
+Total sum: 6336129725
+Cost time: 0.034524 seconds
+❯ ./as.out 16
+Total sum: 6336129725
+Cost time: 0.030697 seconds
+```
+
+| P\N  | 1M       | 2M       | 4M       | 8M       | 16M      | 32M      | 64M      | 128M     |
+| ---- | -------- | -------- | -------- | -------- | -------- | -------- | -------- | -------- |
+| 1    | 0.001771 | 0.003424 | 0.005634 | 0.008436 | 0.017006 | 0.035475 | 0.074379 | 0.145537 |
+| 2    | 0.000794 | 0.001792 | 0.002740 | 0.004492 | 0.008234 | 0.017141 | 0.033816 | 0.075687 |
+| 4    | 0.000377 | 0.000795 | 0.001475 | 0.002281 | 0.004939 | 0.009986 | 0.018382 | 0.036094 |
+| 8    | 0.000599 | 0.000985 | 0.001373 | 0.001943 | 0.004415 | 0.007589 | 0.016177 | 0.034524 |
+| 16   | 0.000664 | 0.000816 | 0.001206 | 0.001930 | 0.003793 | 0.007616 | 0.015637 | 0.030697 |
+
+可视化：
+
+
+
+## 9. 实验结果
 
 N = 1M
 
@@ -621,3 +794,6 @@ Cost time: 0.029182 seconds
 | 8    | 0.000637 | 0.000956 | 0.001593 | 0.002071 | 0.004062 | 0.008950 | 0.016129 | 0.030899 |
 | 16   | 0.000507 | 0.000874 | 0.001135 | 0.001857 | 0.004248 | 0.007547 | 0.015611 | 0.029182 |
 
+可视化：
+
+<img src="https://github.com/xiao10ma/Parallel-Programming/blob/master/PP3/array_wo_mutex.png?raw=true" style="zoom:67%;" />
