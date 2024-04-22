@@ -3,7 +3,7 @@
 #include<sys/time.h>
 #include <omp.h>
 
-const int N = 2; 
+const int N = 128; 
 
 float *A, *B, *C;
 
@@ -64,27 +64,27 @@ int main(int argc, char* argv[]) {
         seconds -= 1;         // 秒数减1
     }
 
-    printf("Matrix A:\n");
-    for (int i = 0; i < N; i ++) {
-        for (int j = 0; j < N; j ++) {
-            printf("%f ", A[i * N + j]);
-        }
-        printf("\n");
-    }
-    printf("Matrix B:\n");
-    for (int i = 0; i < N; i ++) {
-        for (int j = 0; j < N; j ++) {
-            printf("%f ", B[i * N + j]);
-        }
-        printf("\n");
-    }
-    printf("Matrix C:\n");
-    for (int i = 0; i < N; i ++) {
-        for (int j = 0; j < N; j ++) {
-            printf("%f ", C[i * N + j]);
-        }
-        printf("\n");
-    }
+    // printf("Matrix A:\n");
+    // for (int i = 0; i < N; i ++) {
+    //     for (int j = 0; j < N; j ++) {
+    //         printf("%f ", A[i * N + j]);
+    //     }
+    //     printf("\n");
+    // }
+    // printf("Matrix B:\n");
+    // for (int i = 0; i < N; i ++) {
+    //     for (int j = 0; j < N; j ++) {
+    //         printf("%f ", B[i * N + j]);
+    //     }
+    //     printf("\n");
+    // }
+    // printf("Matrix C:\n");
+    // for (int i = 0; i < N; i ++) {
+    //     for (int j = 0; j < N; j ++) {
+    //         printf("%f ", C[i * N + j]);
+    //     }
+    //     printf("\n");
+    // }
 
     // 将时间转换为以秒为单位的浮点数
     double total_seconds = seconds + useconds / 1000000.0;
