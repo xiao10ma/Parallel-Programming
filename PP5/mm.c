@@ -3,7 +3,7 @@
 #include<sys/time.h>
 #include <omp.h>
 
-const int N = 1024; 
+const int N = 2; 
 
 float *A, *B, *C;
 
