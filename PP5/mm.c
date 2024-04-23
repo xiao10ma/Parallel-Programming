@@ -3,11 +3,11 @@
 #include<sys/time.h>
 #include <omp.h>
 
-const int N = 2; 
+const int N = 1024; 
 
 float *A, *B, *C;
 
-int avg_rows;
+int num_thread, avg_rows;
 
 void initialize_matrix(float* matrix, int size, float low, float high) {
     for (int i = 0; i < size; ++i) {
@@ -23,10 +23,11 @@ void initialize_matrix(float* matrix, int size, float low, float high) {
 
 
 void omp_matrix_mul() {
-    int rank = omp_get_thread_num();
-    int first_row = rank * avg_rows;
-    int last_row = (rank + 1) * avg_rows;
-    for (int i = first_row; i < last_row; i ++) {
+    // int rank = omp_get_thread_num();
+    // int first_row = rank * avg_rows;
+    // int last_row = (rank + 1) * avg_rows;
+    #pragma omp parallel for schedule(dynamic, 1) num_threads(num_thread)
+    for (int i = 0; i < N; i ++) {
         for (int j = 0; j < N; j ++) {
             float temp = 0;
             for (int z = 0; z < N; z ++) {
@@ -45,14 +46,14 @@ int main(int argc, char* argv[]) {
     initialize_matrix(A, N, 0., 10.);
     initialize_matrix(B, N, 0., 10.);
 
-    int num_thread = strtol(argv[1], NULL, 10);
+    num_thread = strtol(argv[1], NULL, 10);
     avg_rows = N / num_thread;
 
     struct timeval start_time, end_time;
 
     gettimeofday(&start_time, NULL);
     // 执行并行矩阵乘法
-    # pragma omp parallel num_threads(num_thread)
+    // # pragma omp parallel num_threads(num_thread)
     omp_matrix_mul();
     gettimeofday(&end_time, NULL);
 
@@ -64,27 +65,27 @@ int main(int argc, char* argv[]) {
         seconds -= 1;         // 秒数减1
     }
 
-    printf("Matrix A:\n");
-    for (int i = 0; i < N; i ++) {
-        for (int j = 0; j < N; j ++) {
-            printf("%f ", A[i * N + j]);
-        }
-        printf("\n");
-    }
-    printf("Matrix B:\n");
-    for (int i = 0; i < N; i ++) {
-        for (int j = 0; j < N; j ++) {
-            printf("%f ", B[i * N + j]);
-        }
-        printf("\n");
-    }
-    printf("Matrix C:\n");
-    for (int i = 0; i < N; i ++) {
-        for (int j = 0; j < N; j ++) {
-            printf("%f ", C[i * N + j]);
-        }
-        printf("\n");
-    }
+    // printf("Matrix A:\n");
+    // for (int i = 0; i < N; i ++) {
+    //     for (int j = 0; j < N; j ++) {
+    //         printf("%f ", A[i * N + j]);
+    //     }
+    //     printf("\n");
+    // }
+    // printf("Matrix B:\n");
+    // for (int i = 0; i < N; i ++) {
+    //     for (int j = 0; j < N; j ++) {
+    //         printf("%f ", B[i * N + j]);
+    //     }
+    //     printf("\n");
+    // }
+    // printf("Matrix C:\n");
+    // for (int i = 0; i < N; i ++) {
+    //     for (int j = 0; j < N; j ++) {
+    //         printf("%f ", C[i * N + j]);
+    //     }
+    //     printf("\n");
+    // }
 
     // 将时间转换为以秒为单位的浮点数
     double total_seconds = seconds + useconds / 1000000.0;
