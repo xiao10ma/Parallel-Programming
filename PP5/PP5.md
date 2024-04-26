@@ -189,7 +189,7 @@ Time Elapsed = 5.713462 seconds
 
 可视化：
 
-![](https://github.com/xiao10ma/Parallel-Programming/blob/master/PP5/default.png?raw=true)
+<img src="https://github.com/xiao10ma/Parallel-Programming/blob/master/PP5/default.png?raw=true" style="zoom: 67%;" />
 
 在使用OpenMP进行矩阵乘法的实验中，我们观察到随着矩阵规模的增加，运行时间显著增长。增加进程数可以有效缩短运算时间，特别是当进程数不超过机器的物理核心数（如8核）时，性能提升最为明显。例如，对于2048规模的矩阵，使用8个进程比使用16个进程具有更低的运行时间，显示出并行化的边界效益。这些观察结果表明，在应用并行计算时，选择适宜的进程数是至关重要的，以确保计算资源的高效利用，同时避免因超出物理核心数，由于进程上下文切换而引入的额外并行开销。
 
@@ -293,7 +293,7 @@ Time Elapsed = 6.712368 seconds
 
 可视化：
 
-![](https://github.com/xiao10ma/Parallel-Programming/blob/master/PP5/static.png?raw=true)
+<img src="https://github.com/xiao10ma/Parallel-Programming/blob/master/PP5/static.png?raw=true" style="zoom:67%;" />
 
 在使用静态调度方式进行OpenMP矩阵乘法实验时，我们同样观察到随着矩阵规模的增大，运行时间增长。与默认调度相比，静态调度效率降低。例如，对于2048规模的矩阵，静态调度在使用8核和16核时的运行时间高于默认调度，表明默认调度在任务分配上可能更有效率。
 
@@ -385,7 +385,7 @@ Time Elapsed = 6.779896 seconds
 
 可视化：
 
-![](https://github.com/xiao10ma/Parallel-Programming/blob/master/PP5/dynamic.png?raw=true)
+<img src="https://github.com/xiao10ma/Parallel-Programming/blob/master/PP5/dynamic.png?raw=true" style="zoom:67%;" />
 
 在使用动态调度方式实现OpenMP矩阵乘法时，我们观察到随着进程数的增加，性能下降，尤其是在较大矩阵规模（如2048）上，动态调度的性能劣于默认和静态调度。可能是因为核的工作量基本相同，而动态调度更加适合核的工作量不同的情况，所以可能动态调动对于性能的提升不高，甚至在本实验中导致了性能下降。
 
@@ -532,3 +532,18 @@ Total time: 7.712825 seconds
 | 8    | 0.001709 | 0.019075 | 0.083029 | 0.768914 | 7.224184  |
 | 16   | 0.001755 | 0.009580 | 0.071260 | 0.815397 | 7.712825  |
 
+可视化：
+
+<img src="https://github.com/xiao10ma/Parallel-Programming/blob/master/PP5/parallelfor.png?raw=true" style="zoom:67%;" />
+
+what a pity，似乎效率还不如前面openMP的预处理指令。。
+
+## 6. 实验感想
+
+通过这次的并行程序设计与算法实验，我对并行编程有了更深入的理解和体验。在本次实验中，我使用了OpenMP和Pthreads两种不同的技术来实现矩阵乘法的并行化。实验过程中，我深刻体会到了并行编程在处理大规模计算任务时的强大效能。
+
+首先，通过OpenMP实现的矩阵乘法让我感受到了并行化带来的直观性能提升。尤其是在调整线程数量和选择不同的调度方式时，我可以明显看到运行时间的变化。这不仅验证了并行计算的有效性，也让我认识到在实际应用中选择合适的线程数量和调度策略的重要性。
+
+然而，通过Pthreads手动构建并行for循环的过程虽然较为复杂，却提供了更多的控制空间。尽管最终的性能可能不如使用OpenMP的简便方法，这一过程却加深了我对线程管理和资源分配的理解。
+
+此外，实验中的性能测试和数据可视化也让我认识到了评估并行程序性能的重要性。通过对比不同配置下的执行时间，我更加明白了如何根据具体任务和硬件条件来优化并行程序。
