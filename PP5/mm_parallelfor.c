@@ -1,99 +1,66 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <omp.h>
+#include <string.h>
 #include <time.h>
-#include <sys/time.h>
-#include <pthread.h>
-#include <unistd.h>
 
-int num_thread;
-const int N = 128;
-float *A, *B, *C;
+const int N = 2048;
+int num_threads;
 
-extern void parallel_for(int start, int end, int step, void (*func)(int, void*), void* arg, int num_threads);
+// 需要extern声明以便链接到动态库
+extern void parallel_for(int start, int end, int inc, void *(*func)(int, void*), void *arg, int num_threads);
 
-struct for_index {
-	int start; 
-	int end;
-	int increment;
-};
+typedef struct {
+    double *A, *B, *C;
+    int n;
+} MatrixData;
 
-// function impl
-void *functor(void *args) {
-    struct for_index *idx = (struct for_index *)args;
-    int first = idx->start;
-    int last = idx->end;
-    int increment = idx->increment;
-    for (int i = first; i <= last; i += increment) {
-        for (int j = 0; j < N; j++) {
-            float temp = 0;
-            for (int z = 0; z < N; z++) {
-                temp += A[i * N + z] * B[z * N + j];
-            }
-            C[i * N + j] = temp;
+void *matrix_multiply_functor(int i, void *arg) {
+    MatrixData *data = (MatrixData *)arg;
+    int n = data->n;
+    double *A = data->A;
+    double *B = data->B;
+    double *C = data->C;
+
+    for (int j = 0; j < n; j++) {
+        double sum = 0.0;
+        for (int k = 0; k < n; k++) {
+            sum += A[i * n + k] * B[k * n + j];
         }
+        C[i * n + j] = sum;
+    }
+    return NULL;
+}
+
+void generate_matrix(double *matrix, int n) {
+    for (int i = 0; i < n * n; i++) {
+        matrix[i] = (double)rand() / RAND_MAX;
     }
 }
 
-void initialize_matrix(float *matrix, int size, float low, float high)
-{
-    for (int i = 0; i < size; ++i)
-    {
-        for (int j = 0; j < size; ++j)
-        {
-            // 生成[0, 1)之间的随机浮点数
-            float randomValue = (float)rand() / (float)RAND_MAX;
+int main(int argc, char **argv) {
+    num_threads = atoi(argv[1]);
 
-            // 调整随机数的范围到[low, high)
-            *(matrix + i * size + j) = low + randomValue * (high - low);
-        }
-    }
-}
+    double *A = (double *)malloc(N * N * sizeof(double));
+    double *B = (double *)malloc(N * N * sizeof(double));
+    double *C = (double *)malloc(N * N * sizeof(double));
 
-int main(int argc, char *argv[])
-{
-    A = (float *)malloc(sizeof(float) * N * N);
-    B = (float *)malloc(sizeof(float) * N * N);
-    C = (float *)malloc(sizeof(float) * N * N);
-    initialize_matrix(A, N, 0., 10.);
-    initialize_matrix(B, N, 0., 10.);
-    float times = 0;
-    struct timeval start;
-    struct timeval end;
+    srand((unsigned int)time(NULL));
+    generate_matrix(A, N);
+    generate_matrix(B, N);
 
-    num_thread = strtol(argv[1], NULL, 10);
+    double startTime = omp_get_wtime();
 
-    gettimeofday(&start, NULL);
-    // # pragma omp parallel num_threads(num_thread)
-    // omp_matrix_mul();
-    parallel_for(0, N, 1, functor, NULL, num_thread);
-    gettimeofday(&end, NULL);
+    MatrixData data = {A, B, C, N};
+    parallel_for(0, N, 1, matrix_multiply_functor, &data, num_threads);
 
-    // printf("Matrix A:\n");
-    // for (int i = 0; i < N; i ++) {
-    //     for (int j = 0; j < N; j ++) {
-    //         printf("%f ", A[i * N + j]);
-    //     }
-    //     printf("\n");
-    // }
-    // printf("Matrix B:\n");
-    // for (int i = 0; i < N; i ++) {
-    //     for (int j = 0; j < N; j ++) {
-    //         printf("%f ", B[i * N + j]);
-    //     }
-    //     printf("\n");
-    // }
-    // printf("Matrix C:\n");
-    // for (int i = 0; i < N; i ++) {
-    //     for (int j = 0; j < N; j ++) {
-    //         printf("%f ", C[i * N + j]);
-    //     }
-    //     printf("\n");
-    // }
-    times = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_usec - start.tv_usec);
-    printf("Cost time: %f\n", times / 1000000);
+    double endTime = omp_get_wtime();
+
+    printf("Total time: %f seconds\n", endTime - startTime);
 
     free(A);
     free(B);
     free(C);
+
     return 0;
 }

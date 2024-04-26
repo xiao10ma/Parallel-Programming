@@ -1,28 +1,35 @@
 #include <pthread.h>
-#include <stdlib.h>
+#include <stdio.h>
 
-struct for_index {
-	int start; 
-	int end;
-	int increment;
-};
+typedef struct {
+    int start, end, inc, thread_id;
+    void *(*functor)(int, void*);
+    void *arg;
+} ThreadData;
 
-pthread_t* thread_handles;
-
-void parallel_for (int start, int end, int increment, void*(*functor)(void*), void *arg, int num_threads) {
-    int cnt = end - start;
-    int threads = cnt >= num_threads ? num_threads : cnt;
-    thread_handles = (pthread_t*)malloc(threads * sizeof(pthread_t));
-    int average_loop = cnt / threads;
-    for (int thread = 0; thread < threads; thread ++) {
-        struct for_index* idx = (struct for_index*)malloc(sizeof(struct for_index));
-        idx->start = average_loop * thread;
-        idx->end = average_loop * (thread + 1);
-        idx->increment = increment;
-        pthread_create(&thread_handles[thread], NULL, functor, (void*) idx);
+void *thread_function(void *arg) {
+    ThreadData *data = (ThreadData*) arg;
+    for (int i = data->start; i < data->end; i += data->inc) {
+        data->functor(i, data->arg);
     }
-    for (int thread = 0; thread < threads; thread ++) {
-        pthread_join(thread_handles[thread], NULL);
+    return NULL;
+}
+
+void parallel_for(int start, int end, int inc, void *(*functor)(int, void*), void *arg, int num_threads) {
+    pthread_t threads[num_threads];
+    ThreadData thread_data[num_threads];
+    int chunk_size = (end - start) / num_threads;
+    
+    for (int i = 0; i < num_threads; i++) {
+        thread_data[i].start = start + i * chunk_size;
+        thread_data[i].end = (i == num_threads - 1) ? end : thread_data[i].start + chunk_size;
+        thread_data[i].inc = inc;
+        thread_data[i].functor = functor;
+        thread_data[i].arg = arg;
+        pthread_create(&threads[i], NULL, thread_function, &thread_data[i]);
     }
-    //free(thread_handles);
+    
+    for (int i = 0; i < num_threads; i++) {
+        pthread_join(threads[i], NULL);
+    }
 }
