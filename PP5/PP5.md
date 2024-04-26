@@ -104,3 +104,278 @@ printf("Time Elapsed = %.6f seconds\n", total_seconds);
 
 N = 128:
 
+```bash
+PP5 ) ./mm.out 1
+Time Elapsed = 0.005874 seconds
+PP5 ) ./mm.out 2
+Time Elapsed = 0.003123 seconds
+PP5 ) ./mm.out 4
+Time Elapsed = 0.001781 seconds
+PP5 ) ./mm.out 8
+Time Elapsed = 0.003686 seconds
+PP5 ) ./mm.out 16
+Time Elapsed = 0.001638 seconds
+```
+
+N = 256:
+
+```bash
+PP5 ) ./mm.out 1
+Time Elapsed = 0.047781 seconds
+PP5 ) ./mm.out 2
+Time Elapsed = 0.024062 seconds
+PP5 ) ./mm.out 4
+Time Elapsed = 0.012173 seconds
+PP5 ) ./mm.out 8
+Time Elapsed = 0.016812 seconds
+PP5 ) ./mm.out 16
+Time Elapsed = 0.009599 seconds
+```
+
+N = 512:
+
+```bash
+PP5 ) ./mm.out 1
+Time Elapsed = 0.385720 seconds
+PP5 ) ./mm.out 2
+Time Elapsed = 0.196501 seconds
+PP5 ) ./mm.out 4
+Time Elapsed = 0.102242 seconds
+PP5 ) ./mm.out 8
+Time Elapsed = 0.063299 seconds
+PP5 ) ./mm.out 16
+Time Elapsed = 0.066805 seconds
+```
+
+N = 1024:
+
+```bash
+PP5 ) ./mm.out 1
+Time Elapsed = 3.464608 seconds
+PP5 ) ./mm.out 2
+Time Elapsed = 1.738003 seconds
+PP5 ) ./mm.out 4
+Time Elapsed = 0.874890 seconds
+PP5 ) ./mm.out 8
+Time Elapsed = 0.533318 seconds
+PP5 ) ./mm.out 16
+Time Elapsed = 0.521655 seconds
+```
+
+N = 2048:
+
+```bash
+PP5 ) ./mm.out 1
+Time Elapsed = 34.086398 seconds
+PP5 ) ./mm.out 2
+Time Elapsed = 17.859157 seconds
+PP5 ) ./mm.out 4
+Time Elapsed = 9.262058 seconds
+PP5 ) ./mm.out 8
+Time Elapsed = 4.804137 seconds
+PP5 ) ./mm.out 16
+Time Elapsed = 5.713462 seconds
+```
+
+表格：
+
+| P\N  | 128      | 256      | 512      | 1024     | 2048      |
+| ---- | -------- | -------- | -------- | -------- | --------- |
+| 1    | 0.005874 | 0.047781 | 0.385720 | 3.464608 | 34.086398 |
+| 2    | 0.003123 | 0.024062 | 0.196501 | 1.738003 | 17.859157 |
+| 4    | 0.001781 | 0.012173 | 0.102242 | 0.874890 | 9.262058  |
+| 8    | 0.003686 | 0.016812 | 0.063299 | 0.533318 | 4.804137  |
+| 16   | 0.001638 | 0.009599 | 0.066805 | 0.521655 | 5.713462  |
+
+可视化：
+
+
+
+## 4. 不同调度方式实现
+
+不同调度方式，如静态和动态调度，可以通过预处理指令来实现：
+
+```bash
+1. #pragma omp parallel for schedule(static, 1) num_threads(num_thread)
+2. #pragma omp parallel for schedule (dynamic, 1) num_threads(num_thread)
+```
+
+
+
+### 4.1 静态调度
+
+N = 128:
+
+```bash
+PP5 ) ./mm.out 1
+Time Elapsed = 0.005855 seconds
+PP5 ) ./mm.out 2
+Time Elapsed = 0.003015 seconds
+PP5 ) ./mm.out 4
+Time Elapsed = 0.001751 seconds
+PP5 ) ./mm.out 8
+Time Elapsed = 0.014824 seconds
+PP5 ) ./mm.out 16
+Time Elapsed = 0.001821 seconds
+```
+
+N = 256:
+
+```bash
+PP5 ) ./mm.out 1
+Time Elapsed = 0.048124 seconds
+PP5 ) ./mm.out 2
+Time Elapsed = 0.024265 seconds
+PP5 ) ./mm.out 4
+Time Elapsed = 0.012359 seconds
+PP5 ) ./mm.out 8
+Time Elapsed = 0.015369 seconds
+PP5 ) ./mm.out 16
+Time Elapsed = 0.008438 seconds
+```
+
+N = 512:
+
+```bash
+PP5 ) ./mm.out 1
+Time Elapsed = 0.404326 seconds
+PP5 ) ./mm.out 2
+Time Elapsed = 0.201948 seconds
+PP5 ) ./mm.out 4
+Time Elapsed = 0.100092 seconds
+PP5 ) ./mm.out 8
+Time Elapsed = 0.072592 seconds
+PP5 ) ./mm.out 16
+Time Elapsed = 0.064959 seconds
+```
+
+N = 1024:
+
+```bash
+PP5 ) ./mm.out 1
+Time Elapsed = 3.726951 seconds
+PP5 ) ./mm.out 2
+Time Elapsed = 1.821126 seconds
+PP5 ) ./mm.out 4
+Time Elapsed = 0.931003 seconds
+PP5 ) ./mm.out 8
+Time Elapsed = 0.620243 seconds
+PP5 ) ./mm.out 16
+Time Elapsed = 0.576337 seconds
+```
+
+N = 2048:
+
+```bash
+PP5 ) ./mm.out 1
+Time Elapsed = 43.360471 seconds
+PP5 ) ./mm.out 2
+Time Elapsed = 20.762046 seconds
+PP5 ) ./mm.out 4
+Time Elapsed = 11.449756 seconds
+PP5 ) ./mm.out 8
+Time Elapsed = 6.752237 seconds
+PP5 ) ./mm.out 16
+Time Elapsed = 6.712368 seconds
+```
+
+表格：
+
+| P\N  | 128      | 256      | 512      | 1024     | 2048      |
+| ---- | -------- | -------- | -------- | -------- | --------- |
+| 1    | 0.005855 | 0.048124 | 0.404326 | 3.726951 | 43.360471 |
+| 2    | 0.003015 | 0.024265 | 0.201948 | 1.821126 | 20.762046 |
+| 4    | 0.001751 | 0.012359 | 0.100092 | 0.931003 | 11.449756 |
+| 8    | 0.014824 | 0.015369 | 0.072592 | 0.620243 | 6.752237  |
+| 16   | 0.001821 | 0.008438 | 0.064959 | 0.576337 | 6.712368  |
+
+可视化：
+
+### 4.2 动态调度
+N = 128:
+
+```bash
+PP5 ) ./mm.out 1
+Time Elapsed = 0.005983 seconds
+PP5 ) ./mm.out 2
+Time Elapsed = 0.003115 seconds
+PP5 ) ./mm.out 4
+Time Elapsed = 0.001711 seconds
+PP5 ) ./mm.out 8
+Time Elapsed = 0.001057 seconds
+PP5 ) ./mm.out 16
+Time Elapsed = 0.001329 seconds
+```
+
+N = 256:
+
+```bash
+PP5 ) ./mm.out 1
+Time Elapsed = 0.048604 seconds
+PP5 ) ./mm.out 2
+Time Elapsed = 0.024398 seconds
+PP5 ) ./mm.out 4
+Time Elapsed = 0.012336 seconds
+PP5 ) ./mm.out 8
+Time Elapsed = 0.012760 seconds
+PP5 ) ./mm.out 16
+Time Elapsed = 0.012713 seconds
+```
+
+N = 512:
+
+```bash
+PP5 ) ./mm.out 1
+Time Elapsed = 0.398889 seconds
+PP5 ) ./mm.out 2
+Time Elapsed = 0.200865 seconds
+PP5 ) ./mm.out 4
+Time Elapsed = 0.100701 seconds
+PP5 ) ./mm.out 8
+Time Elapsed = 0.057415 seconds
+PP5 ) ./mm.out 16
+Time Elapsed = 0.055641 seconds
+```
+
+N = 1024:
+
+```bash
+PP5 ) ./mm.out 1
+Time Elapsed = 3.642851 seconds
+PP5 ) ./mm.out 2
+Time Elapsed = 1.848243 seconds
+PP5 ) ./mm.out 4
+Time Elapsed = 0.944562 seconds
+PP5 ) ./mm.out 8
+Time Elapsed = 0.547553 seconds
+PP5 ) ./mm.out 16
+Time Elapsed = 0.548499 seconds
+```
+
+N = 2048:
+
+```bash
+PP5 ) ./mm.out 1
+Time Elapsed = 47.677945 seconds
+PP5 ) ./mm.out 2
+Time Elapsed = 22.641008 seconds
+PP5 ) ./mm.out 4
+Time Elapsed = 11.833128 seconds
+PP5 ) ./mm.out 8
+Time Elapsed = 6.701250 seconds
+PP5 ) ./mm.out 16
+Time Elapsed = 6.779896 seconds
+```
+
+表格：
+
+| P\N  | 128      | 256      | 512      | 1024     | 2048      |
+| ---- | -------- | -------- | -------- | -------- | --------- |
+| 1    | 0.005983 | 0.048604 | 0.398889 | 3.642851 | 47.677945 |
+| 2    | 0.003115 | 0.024398 | 0.200865 | 1.848243 | 22.641008 |
+| 4    | 0.001711 | 0.012336 | 0.100701 | 0.944562 | 11.833128 |
+| 8    | 0.001057 | 0.012760 | 0.057415 | 0.547553 | 6.701250  |
+| 16   | 0.001329 | 0.012713 | 0.055641 | 0.548499 | 6.779896  |
+
+可视化：
+
