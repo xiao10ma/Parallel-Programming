@@ -189,7 +189,9 @@ Time Elapsed = 5.713462 seconds
 
 可视化：
 
+![](https://github.com/xiao10ma/Parallel-Programming/blob/master/PP5/default.png?raw=true)
 
+在使用OpenMP进行矩阵乘法的实验中，我们观察到随着矩阵规模的增加，运行时间显著增长。增加进程数可以有效缩短运算时间，特别是当进程数不超过机器的物理核心数（如8核）时，性能提升最为明显。例如，对于2048规模的矩阵，使用8个进程比使用16个进程具有更低的运行时间，显示出并行化的边界效益。这些观察结果表明，在应用并行计算时，选择适宜的进程数是至关重要的，以确保计算资源的高效利用，同时避免因超出物理核心数，由于进程上下文切换而引入的额外并行开销。
 
 ## 4. 不同调度方式实现
 
@@ -291,6 +293,10 @@ Time Elapsed = 6.712368 seconds
 
 可视化：
 
+![](https://github.com/xiao10ma/Parallel-Programming/blob/master/PP5/static.png?raw=true)
+
+在使用静态调度方式进行OpenMP矩阵乘法实验时，我们同样观察到随着矩阵规模的增大，运行时间增长。与默认调度相比，静态调度效率降低。例如，对于2048规模的矩阵，静态调度在使用8核和16核时的运行时间高于默认调度，表明默认调度在任务分配上可能更有效率。
+
 ### 4.2 动态调度
 N = 128:
 
@@ -378,4 +384,151 @@ Time Elapsed = 6.779896 seconds
 | 16   | 0.001329 | 0.012713 | 0.055641 | 0.548499 | 6.779896  |
 
 可视化：
+
+![](https://github.com/xiao10ma/Parallel-Programming/blob/master/PP5/dynamic.png?raw=true)
+
+在使用动态调度方式实现OpenMP矩阵乘法时，我们观察到随着进程数的增加，性能下降，尤其是在较大矩阵规模（如2048）上，动态调度的性能劣于默认和静态调度。可能是因为核的工作量基本相同，而动态调度更加适合核的工作量不同的情况，所以可能动态调动对于性能的提升不高，甚至在本实验中导致了性能下降。
+
+## 5. Pthreads构建并行for循环
+
+### 5.1 构建parallel_for函数
+
+```cpp
+void parallel_for(int start, int end, int inc, void *(*functor)(int, void*), void *arg, int num_threads) {
+    pthread_t threads[num_threads];
+    ThreadData thread_data[num_threads];
+    int chunk_size = (end - start) / num_threads;
+    
+    for (int i = 0; i < num_threads; i++) {
+        thread_data[i].start = start + i * chunk_size;
+        thread_data[i].end = (i == num_threads - 1) ? end : thread_data[i].start + chunk_size;
+        thread_data[i].inc = inc;
+        thread_data[i].functor = functor;
+        thread_data[i].arg = arg;
+        pthread_create(&threads[i], NULL, thread_function, &thread_data[i]);
+    }
+    
+    for (int i = 0; i < num_threads; i++) {
+        pthread_join(threads[i], NULL);
+    }
+}
+```
+
+利用多线程技术将一个较大的任务分割成多个小块，让每个线程并行处理一部分任务，从而提高程序的执行效率。
+
+编译为.so文件：
+
+```bash
+gcc -shared -fpic -o libparallelfor.so parallel_for.c
+```
+
+### 5.2 引用parallel_for函数
+
+```cpp
+// 需要extern声明以便链接到动态库
+extern void parallel_for(int start, int end, int inc, void *(*func)(int, void*), void *arg, int num_threads);
+
+...
+  
+parallel_for(0, N, 1, matrix_multiply_functor, &data, num_threads);
+```
+
+### 5.3 实验结果
+
+编译mm_parallelfor.c
+
+```bash
+gcc -o matrix_mult.out mm_parallelfor.c -L. -lparallelfor -lpthread -fopenmp
+```
+
+将当前目录加入到环境变量：
+
+```bash
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:.
+```
+
+N = 128:
+
+```bash
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP5$ ./matrix_mult.out 1
+Total time: 0.006226 seconds
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP5$ ./matrix_mult.out 2
+Total time: 0.003153 seconds
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP5$ ./matrix_mult.out 4
+Total time: 0.001921 seconds
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP5$ ./matrix_mult.out 8
+Total time: 0.001709 seconds
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP5$ ./matrix_mult.out 16
+Total time: 0.001755 seconds
+```
+
+N = 256:
+
+```bash
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP5$ ./matrix_mult.out 1
+Total time: 0.048846 seconds
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP5$ ./matrix_mult.out 2
+Total time: 0.024648 seconds
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP5$ ./matrix_mult.out 4
+Total time: 0.012420 seconds
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP5$ ./matrix_mult.out 8
+Total time: 0.019075 seconds
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP5$ ./matrix_mult.out 16
+Total time: 0.009580 seconds
+```
+
+N = 512:
+
+```bash
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP5$ ./matrix_mult.out 1
+Total time: 0.419104 seconds
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP5$ ./matrix_mult.out 2
+Total time: 0.210839 seconds
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP5$ ./matrix_mult.out 4
+Total time: 0.113997 seconds
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP5$ ./matrix_mult.out 8
+Total time: 0.083029 seconds
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP5$ ./matrix_mult.out 16
+Total time: 0.071260 seconds
+```
+
+N = 1024:
+
+```bash
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP5$ ./matrix_mult.out 1
+Total time: 4.707591 seconds
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP5$ ./matrix_mult.out 2
+Total time: 2.551885 seconds
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP5$ ./matrix_mult.out 4
+Total time: 1.340333 seconds
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP5$ ./matrix_mult.out 8
+Total time: 0.768914 seconds
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP5$ ./matrix_mult.out 16
+Total time: 0.815397 seconds
+```
+
+N = 2048:
+
+```bash
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP5$ ./matrix_mult.out 1
+Total time: 47.903420 seconds
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP5$ ./matrix_mult.out 2
+Total time: 24.262633 seconds
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP5$ ./matrix_mult.out 4
+Total time: 12.605440 seconds
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP5$ ./matrix_mult.out 8
+Total time: 7.224184 seconds
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP5$ ./matrix_mult.out 16
+Total time: 7.712825 seconds
+```
+
+表格：
+
+| P\N  | 128      | 256      | 512      | 1024     | 2048      |
+| ---- | -------- | -------- | -------- | -------- | --------- |
+| 1    | 0.006226 | 0.048846 | 0.419104 | 4.707591 | 47.903420 |
+| 2    | 0.003153 | 0.024648 | 0.210839 | 2.551885 | 24.262633 |
+| 4    | 0.001921 | 0.012420 | 0.113997 | 1.340333 | 12.605440 |
+| 8    | 0.001709 | 0.019075 | 0.083029 | 0.768914 | 7.224184  |
+| 16   | 0.001755 | 0.009580 | 0.071260 | 0.815397 | 7.712825  |
 
