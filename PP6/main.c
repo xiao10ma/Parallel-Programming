@@ -133,7 +133,7 @@ Local, double W[M][N], the solution computed at the latest iteration.
     printf("  Spatial grid of %d by %d points.\n", M, N);
     printf("  The iteration will be repeated until the change is <= %e\n", epsilon);
     printf("  Number of processors available = %d\n", threadNums);
-    printf("  Number of threads =              %d\n", omp_get_max_threads());
+    // printf("  Number of threads =              %d\n", omp_get_max_threads());
 
     /*
       Set the boundary values, which don't change.
