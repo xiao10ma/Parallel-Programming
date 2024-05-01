@@ -108,4 +108,805 @@ void *paraller_for(int start, int end, int increment, void *(*functor)(void *), 
 }
 ```
 
-### 2.3 
+### 2.3 实现heated_plate
+
+heated_plate_openmp.c中涉及了很多omp for，例如：
+
+```cpp
+#pragma omp for
+    for ( i = 1; i < M - 1; i++ )
+    {
+      w[i][0] = 100.0;
+    }
+...
+#pragma omp for reduction ( + : mean )
+    for ( i = 1; i < M - 1; i++ )
+    {
+      mean = mean + w[i][0] + w[i][N-1];
+    }
+...
+# pragma omp critical
+      {
+        if ( diff < my_diff )
+        {
+          diff = my_diff;
+        }
+      }
+```
+
+#### 2.3.1 初始化
+
+对于w矩阵的i行0列，(`i = 1; i < M - 1; i ++`)，我是这样实现的：
+
+```cpp
+// openmp:
+#pragma omp for
+    for ( i = 1; i < M - 1; i++ )
+    {
+      w[i][0] = 100.0;
+    }
+```
+
+我们需要changeRow and addRow:
+
+```
+void *changeRow(void *a)
+{
+    Arg arg = *(Arg *)a;
+    int size = (arg.end - arg.start) / arg.threadNums;
+    int rank = arg.rank;
+    int start = arg.start + size * rank;
+    int end;
+    if (rank != arg.threadNums - 1)
+        end = start + size;
+    else
+        end = arg.end;
+    for (int i = start; i < end; i++)
+        arg.W[arg.pos][i] = arg.target;
+}
+```
+
+对应到主函数：
+
+```cpp
+paraller_for(0, threadNums, 1, changeRow, (void *)&arg, threadNums);
+```
+
+其余行与列类似，按照heated_plate_openmp.c实现即可。
+
+#### 2.3.2 更新矩阵内部的值
+
+我们根据原始openmp的代码，实现出对应的pthreads的代码。
+
+我略微解释一下heated_plate_openmp.c代码，并附上对应的pthreads实现：
+
+```cpp
+#pragma omp for reduction ( + : mean )
+    for ( i = 1; i < M - 1; i++ )
+    {
+      mean = mean + w[i][0] + w[i][N-1];
+    }
+#pragma omp for reduction ( + : mean )
+    for ( j = 0; j < N; j++ )
+    {
+      mean = mean + w[M-1][j] + w[0][j];
+    }
+  }
+```
+
+这一部分将初始化赋值的那些元素加入到mean中，方便稍后求均值。
+
+pthreads:
+
+```cpp
+void *addRow(void *a)
+{
+    Arg arg = *(Arg *)a;
+    int size = (arg.end - arg.start) / arg.threadNums;
+    int rank = arg.rank;
+    int start = arg.start + size * rank;
+    int end;
+    if (rank != arg.threadNums - 1)
+        end = start + size;
+    else
+        end = arg.end;
+    double tmp;
+    for (int i = start; i < end; i++)
+        tmp += arg.W[arg.pos][i];
+    pthread_mutex_lock(&myLock);
+    mean += tmp;
+    pthread_mutex_unlock(&myLock);
+}
+void *addCol(void *a)
+{
+    Arg arg = *(Arg *)a;
+    int size = (arg.end - arg.start) / arg.threadNums;
+    int rank = arg.rank;
+    int start = arg.start + size * rank;
+    int end;
+    if (rank != arg.threadNums - 1)
+        end = start + size;
+    else
+        end = arg.end;
+    double tmp;
+    for (int i = start; i < end; i++)
+        tmp += arg.W[i][arg.pos];
+    pthread_mutex_lock(&myLock);
+    mean += tmp;
+    pthread_mutex_unlock(&myLock);
+}
+```
+
+对应main.c
+
+```cpp
+paraller_for(0, threadNums, 1, addRow, (void *)&arg, threadNums);
+paraller_for(0, threadNums, 1, addCol, (void *)&arg, threadNums);
+```
+
+注意，由于pthreads是共享内存的实现方式，因此我们在将tmp加入到mean时，需要将mean上互斥锁。
+
+求均值：
+
+```cpp
+mean = mean / (double)(2 * M + 2 * N - 4);
+```
+
+这一部分openmp与pthreads实现相同，至此，均值求完，我们更新矩阵内部的值。
+
+openmp实现：
+
+```cpp
+#pragma omp parallel shared ( mean, w ) private ( i, j )  num_threads(8)
+  {
+#pragma omp for
+    for ( i = 1; i < M - 1; i++ )
+    {
+      for ( j = 1; j < N - 1; j++ )
+      {
+        w[i][j] = mean;
+      }
+    }
+  }
+```
+
+pthread实现：
+
+```cpp
+void *changeMat(void *a)
+{
+    Arg arg = *(Arg *)a;
+    int size = (arg.end - arg.start) / arg.threadNums;
+    int rank = arg.rank;
+    int start = arg.start + size * rank;
+    int end;
+    if (rank != arg.threadNums - 1)
+        end = start + size;
+    else
+        end = arg.end;
+    for (int i = start; i < end; i++)
+        for (int j = 1; j < arg.pos; j++)
+            arg.W[i][j] = arg.target;
+}
+```
+
+#### 2.3.3 迭代
+
+根据物理热力学的知识，只要当前的系统没有其他额外的输入或影响，最终系统会逐渐趋于稳定，也就是说矩阵中同一位置处的值会基本不变。
+
+对于某一位置的更新，则对应于该简化的公式：
+
+$$
+w_{i,j}^{t+1} = \frac{1}{4}(w_{i-1,j-1}^t + w_{i-1, j+1}^t + w_{i+1,j-1}^t + w_{i+1,j+1}^t)
+$$
+openmp实现：
+
+```cpp
+  while ( epsilon <= diff )
+  {
+# pragma omp parallel shared ( u, w ) private ( i, j )  num_threads(8)
+    {
+/*
+  Save the old solution in U.
+*/
+# pragma omp for
+      for ( i = 0; i < M; i++ ) 
+      {
+        for ( j = 0; j < N; j++ )
+        {
+          u[i][j] = w[i][j];
+        }
+      }
+/*
+  Determine the new estimate of the solution at the interior points.
+  The new solution W is the average of north, south, east and west neighbors.
+*/
+# pragma omp for
+      for ( i = 1; i < M - 1; i++ )
+      {
+        for ( j = 1; j < N - 1; j++ )
+        {
+          w[i][j] = ( u[i-1][j] + u[i+1][j] + u[i][j-1] + u[i][j+1] ) / 4.0;
+        }
+      }
+    }
+/*
+  C and C++ cannot compute a maximum as a reduction operation.
+
+  Therefore, we define a private variable MY_DIFF for each thread.
+  Once they have all computed their values, we use a CRITICAL section
+  to update DIFF.
+*/
+    diff = 0.0;
+# pragma omp parallel shared ( diff, u, w ) private ( i, j, my_diff ) num_threads(8)
+    {
+      my_diff = 0.0;
+# pragma omp for
+      for ( i = 1; i < M - 1; i++ )
+      {
+        for ( j = 1; j < N - 1; j++ )
+        {
+          if ( my_diff < fabs ( w[i][j] - u[i][j] ) )
+          {
+            my_diff = fabs ( w[i][j] - u[i][j] );
+          }
+        }
+      }
+# pragma omp critical
+      {
+        if ( diff < my_diff )
+        {
+          diff = my_diff;
+        }
+      }
+    }
+
+    iterations++;
+    if ( iterations == iterations_print )
+    {
+      printf ( "  %8d  %f\n", iterations, diff );
+      iterations_print = 2 * iterations_print;
+    }
+  } 
+```
+
+pthreads更新矩阵元素：
+
+我一步一步细讲：
+
+在每一次更新时，是不能直接在原矩阵上更新的，因此我们在更新前需要先复制一个矩阵，在矩阵上求一个某一个元素的邻域均值，再赋值给w。
+
+Copy matrix:
+
+```cpp
+void *copyMat(void *a)
+{
+    Arg arg = *(Arg *)a;
+    int size = (arg.end - arg.start) / arg.threadNums;
+    int rank = arg.rank;
+    int start = arg.start + size * rank;
+    int end;
+    if (rank != arg.threadNums - 1)
+        end = start + size;
+    else
+        end = arg.end;
+    for (int i = start; i < end; i++)
+        for (int j = 0; j < arg.pos; j++)
+            arg.U[i][j] = arg.W[i][j];
+}
+```
+
+更新矩阵：
+
+```cpp
+void *compute(void *a)
+{
+    Arg arg = *(Arg *)a;
+    int size = (arg.end - arg.start) / arg.threadNums;
+    int rank = arg.rank;
+    int start = arg.start + size * rank;
+    int end;
+    double **w = arg.W;
+    double **u = arg.U;
+    if (rank != arg.threadNums - 1)
+        end = start + size;
+    else
+        end = arg.end;
+    for (int i = start; i < end; i++)
+        for (int j = 1; j < arg.pos; j++)
+            w[i][j] = (u[i - 1][j] + u[i + 1][j] + u[i][j - 1] + u[i][j + 1]) / 4.0;
+}
+```
+
+求矩阵差异：
+
+```cpp
+void *findDiff(void *a)
+{
+    int key1, key2;
+    Arg arg = *(Arg *)a;
+    int size = (arg.end - arg.start) / arg.threadNums;
+    int rank = arg.rank;
+    int start = arg.start + size * rank;
+    int end;
+    double **w = arg.W;
+    double **u = arg.U;
+    if (rank != arg.threadNums - 1)
+        end = start + size;
+    else
+        end = arg.end;
+    double myDiff = 0.0;
+    for (int i = start; i < end; i++)
+    {
+        for (int j = 1; j < arg.pos; j++)
+        {
+            if (myDiff < fabs(w[i][j] - u[i][j]))
+            {
+                myDiff = fabs(w[i][j] - u[i][j]);
+                key1 = i;
+                key2 = j;
+            }
+        }
+    }
+    pthread_mutex_lock(&myLock);
+    if (diff < myDiff)
+        diff = myDiff;
+    pthread_mutex_unlock(&myLock);
+}
+```
+
+与求和类似，在更新最大diff时，需要用互斥锁互斥更新。
+
+## 3. 实验结果
+
+首先，我们先跑一下heated_plate_openmp.c的实验，用来作为一个baseline。
+
+N = M = 250:
+
+```bash
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP6$ ./heated_plate_openmp.out 
+
+HEATED_PLATE_OPENMP
+  C/OpenMP version
+  A program to solve for the steady state temperature distribution
+  over a rectangular plate.
+
+  Spatial grid of 250 by 250 points.
+  The iteration will be repeated until the change is <= 1.000000e-03
+  Number of processors available = 8
+  Number of threads =              8
+
+  MEAN = 74.899598
+
+ Iteration  Change
+
+         1  18.724900
+         2  9.362450
+         4  4.096072
+         8  2.288040
+        16  1.135841
+        32  0.567820
+        64  0.282615
+       128  0.141682
+       256  0.070760
+       512  0.035403
+      1024  0.017695
+      2048  0.008835
+      4096  0.004164
+      8192  0.001475
+
+      9922  0.001000
+
+  Error tolerance achieved.
+  Wallclock time = 1.479547
+
+HEATED_PLATE_OPENMP:
+  Normal end of execution.
+```
+
+N = M = 500:
+
+```bash
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP6$ ./heated_plate_openmp.out 
+
+HEATED_PLATE_OPENMP
+  C/OpenMP version
+  A program to solve for the steady state temperature distribution
+  over a rectangular plate.
+
+  Spatial grid of 500 by 500 points.
+  The iteration will be repeated until the change is <= 1.000000e-03
+  Number of processors available = 8
+  Number of threads =              8
+
+  MEAN = 74.949900
+
+ Iteration  Change
+
+         1  18.737475
+         2  9.368737
+         4  4.098823
+         8  2.289577
+        16  1.136604
+        32  0.568201
+        64  0.282805
+       128  0.141777
+       256  0.070808
+       512  0.035427
+      1024  0.017707
+      2048  0.008856
+      4096  0.004428
+      8192  0.002210
+     16384  0.001043
+
+     16955  0.001000
+
+  Error tolerance achieved.
+  Wallclock time = 7.364223
+
+HEATED_PLATE_OPENMP:
+  Normal end of execution.
+```
+
+可以看到，openmp的速度真的很快啊，250\*250的矩阵1.47s就跑完，而500\*500也就只要7.36s。
+
+接下来，是pthread实现的parallel_for的评测：
+
+N = M = 250, thread_nums = 1:
+
+```bash
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP6$ ./main.out 250 250 1
+
+HEATED_PLATE_OPENMP
+  C/Pthread version
+  A program to solve for the steady state temperature distribution
+  over a rectangular plate.
+
+  Spatial grid of 250 by 250 points.
+  The iteration will be repeated until the change is <= 1.000000e-03
+  Number of processors available = 1
+
+  MEAN = 74.899598
+
+ Iteration  Change
+
+         1  18.724900
+         2  9.362450
+         4  4.096072
+         8  2.288040
+        16  1.135841
+        32  0.567820
+        64  0.282615
+       128  0.141682
+       256  0.070760
+       512  0.035403
+      1024  0.017695
+      2048  0.008835
+      4096  0.004164
+      8192  0.001475
+
+      9922  0.001000
+
+  Error tolerance achieved.
+  Wallclock time = 16.726149
+
+HEATED_PLATE_OPENMP:
+  Normal end of execution.
+```
+
+N = M = 250, thread_nums = 2:
+
+```bash
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP6$ ./main.out 250 250 2
+
+HEATED_PLATE_OPENMP
+  C/Pthread version
+  A program to solve for the steady state temperature distribution
+  over a rectangular plate.
+
+  Spatial grid of 250 by 250 points.
+  The iteration will be repeated until the change is <= 1.000000e-03
+  Number of processors available = 2
+
+  MEAN = 74.899598
+
+ Iteration  Change
+
+         1  18.724900
+         2  9.362450
+         4  4.096072
+         8  2.288040
+        16  1.135841
+        32  0.567820
+        64  0.282615
+       128  0.141682
+       256  0.070760
+       512  0.035403
+      1024  0.017695
+      2048  0.008835
+      4096  0.004164
+      8192  0.001475
+
+      9922  0.001000
+
+  Error tolerance achieved.
+  Wallclock time = 14.408228
+
+HEATED_PLATE_OPENMP:
+  Normal end of execution.
+```
+
+N = M = 250, thread_nums = 4:
+
+```bash
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP6$ ./main.out 250 250 4
+
+HEATED_PLATE_OPENMP
+  C/Pthread version
+  A program to solve for the steady state temperature distribution
+  over a rectangular plate.
+
+  Spatial grid of 250 by 250 points.
+  The iteration will be repeated until the change is <= 1.000000e-03
+  Number of processors available = 4
+
+  MEAN = 74.899598
+
+ Iteration  Change
+
+         1  18.724900
+         2  9.362450
+         4  4.096072
+         8  2.288040
+        16  1.135841
+        32  0.567820
+        64  0.282615
+       128  0.141682
+       256  0.070760
+       512  0.035403
+      1024  0.017695
+      2048  0.008835
+      4096  0.004164
+      8192  0.001475
+
+      9922  0.001000
+
+  Error tolerance achieved.
+  Wallclock time = 14.353445
+
+HEATED_PLATE_OPENMP:
+  Normal end of execution.
+```
+
+N = M = 250, thread_nums = 8:
+
+```bash
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP6$ ./main.out 250 250 8
+
+HEATED_PLATE_OPENMP
+  C/Pthread version
+  A program to solve for the steady state temperature distribution
+  over a rectangular plate.
+
+  Spatial grid of 250 by 250 points.
+  The iteration will be repeated until the change is <= 1.000000e-03
+  Number of processors available = 8
+
+  MEAN = 74.899598
+
+ Iteration  Change
+
+         1  18.724900
+         2  9.362450
+         4  4.096072
+         8  2.288040
+        16  1.135841
+        32  0.567820
+        64  0.282615
+       128  0.141682
+       256  0.070760
+       512  0.035403
+      1024  0.017695
+      2048  0.008835
+      4096  0.004164
+      8192  0.001475
+
+      9922  0.001000
+
+  Error tolerance achieved.
+  Wallclock time = 17.758982
+
+HEATED_PLATE_OPENMP:
+  Normal end of execution.
+```
+
+首先，我们实验的正确性是可以保证的，求得的mean相同，并且最重要的，我们都是在9922这个iter结束迭代。
+
+但是，可以看到，我的指标是明显不如openmp的。其中一个重要原因，就是王老师上课所提到的伪共享。在每一轮的更新中，由于不同线程可能会对同一个cache line进行反复的读写，即使这些变量彼此之间没有直接的数据依赖关系，每次修改也会导致其他核心上缓存行的无效化。这就意味着，即使各线程工作在不同的变量上，它们还是会互相影响对方的性能，因为每次修改都需要从主内存中重新加载整个缓存行。此外，我每调用一次自己实现的parallel_for函数，都会涉及到线程的创建与合并。这里其实可能也是导致运行减慢的一个重要因素。
+
+N = M = 500, thread_nums = 1:
+
+```bash
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP6$ ./main.out 500 500 1
+
+HEATED_PLATE_OPENMP
+  C/Pthread version
+  A program to solve for the steady state temperature distribution
+  over a rectangular plate.
+
+  Spatial grid of 500 by 500 points.
+  The iteration will be repeated until the change is <= 1.000000e-03
+  Number of processors available = 1
+
+  MEAN = 74.949900
+
+ Iteration  Change
+
+         1  18.737475
+         2  9.368737
+         4  4.098823
+         8  2.289577
+        16  1.136604
+        32  0.568201
+        64  0.282805
+       128  0.141777
+       256  0.070808
+       512  0.035427
+      1024  0.017707
+      2048  0.008856
+      4096  0.004428
+      8192  0.002210
+     16384  0.001043
+
+     16955  0.001000
+
+  Error tolerance achieved.
+  Wallclock time = 46.787368
+
+HEATED_PLATE_OPENMP:
+  Normal end of execution.
+```
+
+N = M = 500, thread_nums = 2:
+
+```bash
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP6$ ./main.out 500 500 2
+
+HEATED_PLATE_OPENMP
+  C/Pthread version
+  A program to solve for the steady state temperature distribution
+  over a rectangular plate.
+
+  Spatial grid of 500 by 500 points.
+  The iteration will be repeated until the change is <= 1.000000e-03
+  Number of processors available = 2
+
+  MEAN = 74.949900
+
+ Iteration  Change
+
+         1  18.737475
+         2  9.368737
+         4  4.098823
+         8  2.289577
+        16  1.136604
+        32  0.568201
+        64  0.282805
+       128  0.141777
+       256  0.070808
+       512  0.035427
+      1024  0.017707
+      2048  0.008856
+      4096  0.004428
+      8192  0.002210
+     16384  0.001043
+
+     16955  0.001000
+
+  Error tolerance achieved.
+  Wallclock time = 30.683121
+
+HEATED_PLATE_OPENMP:
+  Normal end of execution.
+```
+
+N = M = 500, thread_nums = 4:
+
+```bash
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP6$ ./main.out 500 500 4
+
+HEATED_PLATE_OPENMP
+  C/Pthread version
+  A program to solve for the steady state temperature distribution
+  over a rectangular plate.
+
+  Spatial grid of 500 by 500 points.
+  The iteration will be repeated until the change is <= 1.000000e-03
+  Number of processors available = 4
+
+  MEAN = 74.949900
+
+ Iteration  Change
+
+         1  18.737475
+         2  9.368737
+         4  4.098823
+         8  2.289577
+        16  1.136604
+        32  0.568201
+        64  0.282805
+       128  0.141777
+       256  0.070808
+       512  0.035427
+      1024  0.017707
+      2048  0.008856
+      4096  0.004428
+      8192  0.002210
+     16384  0.001043
+
+     16955  0.001000
+
+  Error tolerance achieved.
+  Wallclock time = 23.673142
+
+HEATED_PLATE_OPENMP:
+  Normal end of execution.
+```
+
+N = M = 500, thread_nums = 8:
+
+```bash
+xiaoma@xiaoma-virtual-machine:~/Parallel-Programming/PP6$ ./main.out 500 500 8
+
+HEATED_PLATE_OPENMP
+  C/Pthread version
+  A program to solve for the steady state temperature distribution
+  over a rectangular plate.
+
+  Spatial grid of 500 by 500 points.
+  The iteration will be repeated until the change is <= 1.000000e-03
+  Number of processors available = 8
+
+  MEAN = 74.949900
+
+ Iteration  Change
+
+         1  18.737475
+         2  9.368737
+         4  4.098823
+         8  2.289577
+        16  1.136604
+        32  0.568201
+        64  0.282805
+       128  0.141777
+       256  0.070808
+       512  0.035427
+      1024  0.017707
+      2048  0.008856
+      4096  0.004428
+      8192  0.002210
+     16384  0.001043
+
+     16955  0.001000
+
+  Error tolerance achieved.
+  Wallclock time = 29.062525
+
+HEATED_PLATE_OPENMP:
+```
+
+同样，我们结果的正确性是可以保证的。
+
+并且，由于矩阵规模的增大，不同进程访问同一块cache line的概率减小，伪共享的影响有所减小。
+
+表格：
+
+| P\N  | 250       | 1000      |
+| ---- | --------- | --------- |
+| 1    | 16.726149 | 46.787368 |
+| 2    | 14.408228 | 30.683121 |
+| 4    | 14.353445 | 23.673142 |
+| 8    | 17.758982 | 29.062525 |
+
+可视化：
+
