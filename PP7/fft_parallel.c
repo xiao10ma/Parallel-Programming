@@ -398,19 +398,19 @@ void step(int n, int mj, double a[], double b[], double c[], double d[], double 
   mj2 = 2 * mj;
   lj = n / mj2;
 
-  // 每个进程需要处理的复数的数量
-  int size = (lj % comm_sz == 0) ? (lj / comm_sz) : (lj / comm_sz + 1);
-  // 每个进程开始处理的复数的位置
-  int startlocal = (my_rank * size > lj) ? lj : my_rank * size;
-  // 每个进程结束处理的复数的位置（取不到的）
-  int endlocal = ((my_rank + 1) * size > lj) ? lj : (my_rank + 1) * size;
+  // avg complex number
+  int local_size = (lj % comm_sz == 0) ? (lj / comm_sz) : (lj / comm_sz + 1);
+  // complex start position
+  int startlocal = (my_rank * local_size > lj) ? lj : my_rank * local_size;
+  // 每个进程结束处理的复数的位置（取整余数）
+  int endlocal = ((my_rank + 1) * local_size > lj) ? lj : (my_rank + 1) * local_size;
 
   int count = 0;  // 用于计算传输大小
 
   if (my_rank == 0) {
-    for (int i = 1; i < comm_sz; i++) {
-      int start = (i * size > lj) ? lj : i * size;
-      int end = ((i + 1) * size) > lj ? lj : (i + 1) * size;
+    for (int i = 0; i < comm_sz; i++) {
+      int start = (i * local_size > lj) ? lj : i * local_size;
+      int end = ((i + 1) * local_size) > lj ? lj : (i + 1) * local_size;
       MPI_Send(&a[start * mj2], (end - start) * mj2, MPI_DOUBLE, i, 0, MPI_COMM_WORLD);
       MPI_Send(&b[start * mj2], (end - start) * mj2, MPI_DOUBLE, i, 0, MPI_COMM_WORLD);
       MPI_Send(&w[start * mj2], (end - start) * mj2, MPI_DOUBLE, i, 0, MPI_COMM_WORLD);
@@ -423,18 +423,16 @@ void step(int n, int mj, double a[], double b[], double c[], double d[], double 
       // MPI_Send(sendbuf, position, MPI_PACKED, i, 0, MPI_COMM_WORLD);
     }
   } 
-  else {
-    MPI_Recv(&a[startlocal * mj2], (endlocal - startlocal) * mj2, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    MPI_Recv(&b[startlocal * mj2], (endlocal - startlocal) * mj2, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    MPI_Recv(&w[startlocal * mj2], (endlocal - startlocal) * mj2, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    // count = (endlocal - startlocal) * mj2;
-    // double recvbuf[count * 3];
-    // MPI_Recv(recvbuf, count * 3 * sizeof(MPI_DOUBLE), MPI_PACKED, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    // int position = 0;
-    // MPI_Unpack(recvbuf, count * 3 * sizeof(MPI_DOUBLE), &position, &a[startlocal * mj2], count, MPI_DOUBLE, MPI_COMM_WORLD);
-    // MPI_Unpack(recvbuf, count * 3 * sizeof(MPI_DOUBLE), &position, &b[startlocal * mj2], count, MPI_DOUBLE, MPI_COMM_WORLD);
-    // MPI_Unpack(recvbuf, count * 3 * sizeof(MPI_DOUBLE), &position, &w[startlocal * mj2], count, MPI_DOUBLE, MPI_COMM_WORLD);
-  }
+  MPI_Recv(&a[startlocal * mj2], (endlocal - startlocal) * mj2, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+  MPI_Recv(&b[startlocal * mj2], (endlocal - startlocal) * mj2, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+  MPI_Recv(&w[startlocal * mj2], (endlocal - startlocal) * mj2, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+  // count = (endlocal - startlocal) * mj2;
+  // double recvbuf[count * 3];
+  // MPI_Recv(recvbuf, count * 3 * sizeof(MPI_DOUBLE), MPI_PACKED, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+  // int position = 0;
+  // MPI_Unpack(recvbuf, count * 3 * sizeof(MPI_DOUBLE), &position, &a[startlocal * mj2], count, MPI_DOUBLE, MPI_COMM_WORLD);
+  // MPI_Unpack(recvbuf, count * 3 * sizeof(MPI_DOUBLE), &position, &b[startlocal * mj2], count, MPI_DOUBLE, MPI_COMM_WORLD);
+  // MPI_Unpack(recvbuf, count * 3 * sizeof(MPI_DOUBLE), &position, &w[startlocal * mj2], count, MPI_DOUBLE, MPI_COMM_WORLD);
 
   // 计算
   for (j = startlocal; j < endlocal; j++) {
@@ -464,9 +462,9 @@ void step(int n, int mj, double a[], double b[], double c[], double d[], double 
   }
 
   if(my_rank == 0) {
-    for (int i = 1; i < comm_sz; i++) {
-      int start = (i * size > lj) ? lj : i * size;
-      int end = ((i + 1) * size) > lj ? lj : (i + 1) * size;
+    for (int i = 0; i < comm_sz; i++) {
+      int start = (i * local_size > lj) ? lj : i * local_size;
+      int end = ((i + 1) * local_size) > lj ? lj : (i + 1) * local_size;
       if(start == end) continue;
       MPI_Recv(&c[start * mj2 * 2], (end - start - 1) * mj2 * 2 + 2 * mj, MPI_DOUBLE, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
       MPI_Recv(&d[start * mj2 * 2], (end - start - 1) * mj2 * 2 + 2 * mj, MPI_DOUBLE, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
