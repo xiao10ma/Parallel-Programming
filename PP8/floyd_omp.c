@@ -5,10 +5,9 @@
 #include <omp.h>
 #include <string.h>
 
-// Define the number of nodes in the graph
+// 图规模
 #define N 1000
 
-// Define minimum function that will be used later on to calcualte minimum values between two numbers
 #ifndef min
 #define min(a, b) (((a) < (b)) ? (a) : (b))
 #endif
@@ -17,9 +16,9 @@
 #define max(a, b) (((a) > (b)) ? (a) : (b))
 #endif
 
-// Define matrix of size N * N to store distances between nodes
-// Initialize all distances to zero
+// 邻接矩阵 存图
 double distance_matrix[N][N] = {};
+double original_distance_matrix[N][N] = {};
 
 int main(int argc, char *argv[])
 {
@@ -33,7 +32,7 @@ int main(int argc, char *argv[])
     }
 
     FILE *file1 = fopen("updated_mouse.csv", "r");
-    char buffer[32];    // 4 + 4 + 4
+    char buffer[32];    
     // 读取并忽略第一行
     fgets(buffer, 32, file1);
 
@@ -51,21 +50,19 @@ int main(int argc, char *argv[])
         min_index = min(min_index, b);
     }
 
+    memcpy(original_distance_matrix, distance_matrix, sizeof(distance_matrix));
+
     int nthreads;
     int src, dst, middle;
+    int i, j, k;
 
-    // Define time variable to record start time for execution of program
     double start_time = omp_get_wtime();
 
-    for (middle = 0; middle < N; middle++)
-    {
-        double *dm = distance_matrix[middle];
-        for (src = 0; src < N; src++)
-        {
-            double *ds = distance_matrix[src];
-            for (dst = 0; dst < N; dst++)
-            {
-                ds[dst] = min(ds[dst], ds[middle] + dm[dst]);
+    // Serial Floyd
+    for (k = 0; k < N; k++) {
+        for (i = 0; i < N; i ++) {
+            for (j = 0; j < N; j ++) {
+                distance_matrix[i][j] = min(distance_matrix[i][j], distance_matrix[i][k] + distance_matrix[k][j]);
             }
         }
     }
@@ -75,6 +72,9 @@ int main(int argc, char *argv[])
 
     for (nthreads = 1; nthreads <= 16; nthreads*=2)
     {
+        // 恢复初始矩阵
+        memcpy(distance_matrix, original_distance_matrix, sizeof(distance_matrix));
+
         // Define different number of threads
         omp_set_num_threads(nthreads);
 
@@ -82,29 +82,23 @@ int main(int argc, char *argv[])
         // Define time variable to record start time for execution of program
         double start_time = omp_get_wtime();
 
-/* Taking a node as mediator
-check if indirect distance between source and distance via mediator
-is less than direct distance between them */
-#pragma omp parallel shared(distance_matrix)
-        for (middle = 0; middle < N; middle++)
-        {
-            double *dm = distance_matrix[middle];
-#pragma omp parallel for private(src, dst) schedule(dynamic)
-            for (src = 0; src < N; src++)
-            {
-                double *ds = distance_matrix[src];
-                for (dst = 0; dst < N; dst++)
-                {
-                    ds[dst] = min(ds[dst], ds[middle] + dm[dst]);
+
+        for (k = 0; k < N; k++) {
+            // 内层for循环并行
+            #pragma omp parallel for private(i, j) shared(distance_matrix, k)
+            for (i = 0; i < N; i++) {
+                for (j = 0; j < N; j++) {
+                    distance_matrix[i][j] = min(distance_matrix[i][j], distance_matrix[i][k] + distance_matrix[k][j]);
                 }
             }
         }
+        
 
         double time = omp_get_wtime() - start_time;
         printf("Total time for thread %d (in sec):%.2f\n", nthreads, time);
     }
 
-    FILE *file2 = fopen("mat.txt", "w");
+    FILE *file2 = fopen("mat_mouse.txt", "w");
     for (int i = 0; i < 1000; ++i) {
         for (int j = 0; j < 1000; ++j) {
             fprintf(file2, "%f ", distance_matrix[i][j]);
@@ -115,7 +109,6 @@ is less than direct distance between them */
 
     fclose(file1); // 关闭文件
     fclose(file2); // 关闭文件
-
 
     return 0;
 }
