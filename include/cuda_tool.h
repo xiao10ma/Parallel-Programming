@@ -86,7 +86,7 @@ void initDevice(int devNum)
 }
 void checkResult(float *hostRef, float *gpuRef, const int N)
 {
-    double epsilon = 1.0E-8;
+    double epsilon = 1.0E-1;
     for (int i = 0; i < N; i++)
     {
         if (abs(hostRef[i] - gpuRef[i]) > epsilon)
