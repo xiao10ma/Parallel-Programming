@@ -9,7 +9,8 @@ const int channel = 3;  // 通道数
 const int K = 3;    // kernel size
 const int convOutSize = N - K + 1;
 
-__constant__ float kernel_dev[K * K * channel];
+__device__ float kernel_dev[K * K * channel];
+// __constant__ float kernel_dev[K * K * channel];
 
 void CPU_Conv(float *input, float *output, float *kernel) {
     for (int row = 0; row < convOutSize; row ++) {
@@ -82,6 +83,8 @@ __global__ void im2col(float *input, float *col_vec, float *res_dev) {
             // 2. col_vec: i * K + j 行
             //             row * convOutSize + col 列 
             col_vec[(i * K + j) * col_vec_row + row * convOutSize + col] = input[curRow * N + curCol];
+            col_vec[(i * K + j) * col_vec_row + row * convOutSize + col + col_vec_row * K * K] = input[curRow * N + curCol + N * N];
+            col_vec[(i * K + j) * col_vec_row + row * convOutSize + col + 2 * col_vec_row * K * K] = input[curRow * N + curCol + N * N * 2];
         }
     }
     __syncthreads();
