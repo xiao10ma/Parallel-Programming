@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "cuda_tool.h"
+#include <cublas_v2.h>
 #include <cudnn.h>
 
 #define USE_CPU 1
@@ -49,18 +50,13 @@ __global__ void Conv2DKernel(float *input, float *output) {
     output[row * convOutSize + col] = sum;
 }
 
-__device__ void matrix_mul(float *col_vec, float *res_dev) {
-    const int nRow = blockIdx.y * blockDim.y + threadIdx.y;
-    const int nCol = blockIdx.x * blockDim.x + threadIdx.x;
-    if (nRow >= convOutSize || nCol >= convOutSize) return;
-
+__device__ float matrix_mul_element(const float *col_vec, int nRow, int nCol) {
     const int col_vec_row = convOutSize * convOutSize;
     float c_sum = 0.f;
-    for (int i = 0; i < K * K; i ++) {
+    for (int i = 0; i < K * K * channel; i++) {
         c_sum += kernel_dev[i] * col_vec[i * col_vec_row + nRow * convOutSize + nCol];
     }
-
-    res_dev[nRow * convOutSize + nCol] = c_sum;
+    return c_sum;
 }
 
 __global__ void im2col(float *input, float *col_vec, float *res_dev) {
@@ -73,23 +69,24 @@ __global__ void im2col(float *input, float *col_vec, float *res_dev) {
     int curCol = 0, curRow = 0;
 
     const int col_vec_row = convOutSize * convOutSize;
-    // const int col_vec_col = K * K * 3;
 
-    for (int i = 0; i < K; i ++) {
-        for (int j = 0; j < K; j ++) {
+    for (int i = 0; i < K; i++) {
+        for (int j = 0; j < K; j++) {
             curRow = row + i;
             curCol = col + j;
-            // 1. input
-            // 2. col_vec: i * K + j 行
-            //             row * convOutSize + col 列 
             col_vec[(i * K + j) * col_vec_row + row * convOutSize + col] = input[curRow * N + curCol];
             col_vec[(i * K + j) * col_vec_row + row * convOutSize + col + col_vec_row * K * K] = input[curRow * N + curCol + N * N];
             col_vec[(i * K + j) * col_vec_row + row * convOutSize + col + 2 * col_vec_row * K * K] = input[curRow * N + curCol + N * N * 2];
         }
     }
     __syncthreads();
-    matrix_mul(col_vec, res_dev);
+
+    if (row < convOutSize && col < convOutSize) {
+        float result = matrix_mul_element(col_vec, row, col);
+        res_dev[row * convOutSize + col] = result;
+    }
 }
+
 
 int main() {
     int imgSize = N * N * channel;
@@ -132,6 +129,7 @@ int main() {
 
     double iStart_cuda = cpuSecond();
     Conv2DKernel<<<grid, block>>>(matrix_dev, conved_m_dev);
+    cudaDeviceSynchronize();
     double iElaps_cuda=cpuSecond()-iStart_cuda;
     printf("CUDA \t\t\tExecution Time elapsed %f sec\n", iElaps_cuda);
     cudaMemcpy(conved_m_host, conved_m_dev, conved_matrix_bytes, cudaMemcpyDeviceToHost);
@@ -139,6 +137,7 @@ int main() {
 
     double iStart_cuda_im2col = cpuSecond();
     im2col<<<grid, block>>>(matrix_dev, col_vec_dev, conved_m_dev);
+    cudaDeviceSynchronize();
     double iElaps_cuda_im2col=cpuSecond()-iStart_cuda_im2col;
     printf("CUDA_im2col: \t\tExecution Time elapsed %f sec\n", iElaps_cuda_im2col);
 
@@ -192,6 +191,7 @@ int main() {
         &beta,
         out_desc, out_data
     );
+    cudaDeviceSynchronize();
     double iElaps_cudnn = cpuSecond() - iStart_cudnn;
     printf("cuDNN \t\t\tExecution Time elapsed %f sec\n", iElaps_cudnn);
 
