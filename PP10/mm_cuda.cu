@@ -3,8 +3,8 @@
 #include "cuda_tool.h"
 
 #define USE_CPU 1
-const int N = 2048;
-const int block_size = 8;
+const int N = 1024;
+const int block_size = 16;
 
 void mm_cpu(float *A_host, float *B_host, float *C_host) {
     for (int i = 0; i < N; i ++) {
@@ -91,11 +91,13 @@ int main()
 
     double iStart_cuda=cpuSecond();
     mm_cuda<<<grid, block>>>(A_dev, B_dev, C_dev);
+    cudaDeviceSynchronize();
     double iElaps_cuda=cpuSecond()-iStart_cuda;
     printf("CUDA \t\t\tExecution Time elapsed %f sec\n", iElaps_cuda);
 
     double iStart_shared=cpuSecond();
     mm_shared_mem<<<grid, block>>>(A_dev, B_dev, C_dev_shared);
+    cudaDeviceSynchronize();
     double iElaps_shared=cpuSecond()-iStart_shared;
     printf("CUDA(shared mem) \tExecution Time elapsed %f sec\n", iElaps_shared);
     printf("---------------------------------------------\n");
