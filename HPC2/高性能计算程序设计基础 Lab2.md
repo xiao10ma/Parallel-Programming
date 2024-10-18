@@ -7,7 +7,7 @@
 
 ## 1. Pthreads实现矩阵乘法
 
-代码见附件或[github](https://github.com/xiao10ma/Parallel-Programming/tree/master/PP3).
+代码见附件或[github](https://github.com/xiao10ma/Parallel-Programming/tree/master/HPC2).
 
 ⾸先，先进⾏⼀些初始化：
 
